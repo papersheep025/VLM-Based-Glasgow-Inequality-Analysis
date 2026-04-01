@@ -42,7 +42,7 @@ def main():
         gold_row = gold.get(row["id"])
         if gold_row is None:
             continue
-        pred = row.get("prediction_json", {})
+        pred = row.get("prediction_json", {}) if isinstance(row.get("prediction_json", {}), dict) else {}
         rows.append(
             {
                 "id": row["id"],

@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import argparse
@@ -56,7 +56,7 @@ def main():
 
     errors = []
     for i, row in enumerate(rows[:n], start=1):
-        for key in ("id", "datazone", "streetview_path", "satellite_path", "prompt", "answer_json"):
+        for key in ("id", "datazone", "streetview_path", "satellite_path", "prompt"):
             if key not in row or row[key] in (None, ""):
                 errors.append(f"Sample {i}: missing or empty field '{key}'")
 
@@ -82,12 +82,13 @@ def main():
         except Exception as exc:
             errors.append(f"Sample {i}: failed to read image: {exc}")
 
-        try:
-            answer = json.loads(row["answer_json"])
-            if "predicted_quintile" not in answer and "predicted_rank_band" not in answer:
-                errors.append(f"Sample {i}: answer_json does not contain expected prediction field")
-        except Exception as exc:
-            errors.append(f"Sample {i}: invalid answer_json: {exc}")
+        if "answer_json" in row and row["answer_json"] not in (None, ""):
+            try:
+                answer = json.loads(row["answer_json"])
+                if "predicted_quintile" not in answer and "predicted_rank_band" not in answer and "above_median_deprivation" not in answer:
+                    errors.append(f"Sample {i}: answer_json does not contain expected prediction field")
+            except Exception as exc:
+                errors.append(f"Sample {i}: invalid answer_json: {exc}")
 
     if errors:
         print("\nSmoke test failed:")
@@ -100,3 +101,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -6,7 +6,9 @@ from pathlib import Path
 
 SYSTEM_PROMPT = (
     "You are a geospatial inequality analyst. "
-    "Use the provided images to infer deprivation."
+    "Infer deprivation from visual cues. "
+    "Think step-by-step internally but do not reveal reasoning. "
+    "Return JSON only."
 )
 
 
@@ -49,33 +51,57 @@ def build_instruction(
             resolved_modalities = resolved_modalities + (tertiary_modality,)
         modalities = tuple(dict.fromkeys(mod for mod in resolved_modalities if mod))
     modality_phrase = describe_modalities(modalities)
+    core_rules = (
+        "Reason internally, but do not reveal reasoning. "
+        "Use consistent visual cues across modalities when possible. "
+        "Output one valid JSON object only. All fields must always be present, even if empty. "
+        "Evidence must be a JSON object with keys streetview, satellite, and nightlight; each value must be a list of 3-5 short phrases (<8 words), or [] if missing. "
+        "visual_indicators must contain density, greenery, lighting, infrastructure, building_condition, land_use_mix, cleanliness, accessibility, vehicle_presence, housing_type, and vacancy, each as a float between 0 and 1. "
+        "Infer these indicators from the images only; do not derive them from labels or prior knowledge. "
+        "Use 0 for very low presence, 0.5 for moderate presence, and 1 for very high presence. "
+        "High density usually maps to 0.8-1.0; sparse buildings usually map to 0.2-0.4. "
+        "confidence must be a float between 0 and 1; lower it when evidence is weak, modalities disagree, or features are unclear. "
+        "If unsure about any field, still return a best guess instead of leaving it empty. "
+        "Do not output evidence as a paragraph. "
+        "Do not use prior knowledge about the location."
+    )
+    schema_example = (
+        '{"predicted_quintile": 3, "confidence": 0.6, '
+        '"evidence": {"streetview": ["brick houses", "narrow street", "few trees"], '
+        '"satellite": ["dense buildings", "road grid", "small gardens"], '
+        '"nightlight": ["dim lighting", "patchy glow", "dark edges"]}, '
+        '"visual_indicators": {"density": 0.8, "greenery": 0.3, "lighting": 0.4, "infrastructure": 0.6, '
+        '"building_condition": 0.5, "land_use_mix": 0.5, "cleanliness": 0.6, "accessibility": 0.5, '
+        '"vehicle_presence": 0.4, "housing_type": 0.6, "vacancy": 0.2}}'
+    )
     if task == "ordinal":
         return (
-            f"Predict the Glasgow SIMD deprivation quintile for this location using the street-view image together with {modality_phrase}. "
-            "Return only valid JSON with fields: predicted_quintile, confidence, evidence."
+            f"Predict the deprivation quintile for this location using the street-view image together with {modality_phrase}. "
+            f"{core_rules} Return JSON with fields: predicted_quintile, confidence, evidence, visual_indicators. "
+            f"Example JSON: {schema_example}"
         )
     if task == "rank":
         return (
-            f"Predict the SIMD rank band for this location using the street-view image together with {modality_phrase}. "
-            "Return only valid JSON with fields: predicted_rank_band, confidence, evidence."
+            f"Predict the rank band for this location using the street-view image together with {modality_phrase}. "
+            f"{core_rules} Return JSON with fields: predicted_rank_band, confidence, evidence, visual_indicators. "
+            f"Example JSON: {schema_example}"
         )
     if task == "explain":
         return (
             f"Describe the shared visual cues across the street-view image together with {modality_phrase}, "
-            "then predict whether the location is above or below the Glasgow median deprivation level. "
-            "Return only valid JSON with fields: above_median_deprivation, confidence, evidence."
+            "then predict whether the location is above or below the median deprivation level. "
+            f"{core_rules} Return JSON with fields: above_median_deprivation, predicted_rank_band, confidence, evidence, visual_indicators. "
+            f"Example JSON: {schema_example}"
         )
     return (
-        "Analyze the location and return only valid JSON with fields: "
-        "predicted_quintile, confidence, evidence."
+        f"Analyze the location using {modality_phrase}. {core_rules} Return JSON with fields: predicted_quintile, confidence, evidence, visual_indicators. "
+        f"Example JSON: {schema_example}"
     )
 
 
 def build_answer(record: dict, task: str = "ordinal") -> str:
     quintile = record.get("deprivation_quintile")
     rank = record.get("deprivation_rank")
-    payload: dict[str, object]
-
     if task == "rank":
         band = "unknown"
         if isinstance(rank, (int, float)):
@@ -86,19 +112,23 @@ def build_answer(record: dict, task: str = "ordinal") -> str:
         payload = {
             "predicted_rank_band": band,
             "confidence": 1.0,
-            "evidence": [],
         }
     elif task == "explain":
+        band = "unknown"
+        if isinstance(rank, (int, float)):
+            rank_int = int(rank)
+            low = max(1, (rank_int // 1000) * 1000)
+            high = min(5000, low + 999)
+            band = f"{low}-{high}"
         payload = {
             "above_median_deprivation": bool(quintile is not None and int(quintile) >= 3),
+            "predicted_rank_band": band,
             "confidence": 1.0,
-            "evidence": [],
         }
     else:
         payload = {
             "predicted_quintile": int(quintile) if quintile is not None else None,
             "confidence": 1.0,
-            "evidence": [],
         }
     return json.dumps(payload, ensure_ascii=False)
 
@@ -110,18 +140,17 @@ def build_prompt(
     tertiary_modality: str | None = None,
     modalities: tuple[str, ...] | None = None,
 ) -> str:
-    datazone = record.get("datazone", "unknown")
-    lat = record.get("lat")
-    lon = record.get("lon")
     if modalities is None:
         resolved_modalities = ("satellite", secondary_modality)
         if tertiary_modality:
             resolved_modalities = resolved_modalities + (tertiary_modality,)
         modalities = tuple(dict.fromkeys(mod for mod in resolved_modalities if mod))
     modality_phrase = describe_modalities(modalities)
-    location = f"DataZone={datazone}, lat={lat}, lon={lon}"
-    return f"{build_instruction(task, secondary_modality, tertiary_modality, modalities)} Location metadata: {location}. Image modalities: {modality_phrase}."
+    location = "Location metadata unavailable."
+    return f"{build_instruction(task, secondary_modality, tertiary_modality, modalities)} {location} Image modalities: {modality_phrase}."
 
 
 def to_abs_uri(path: str | Path) -> str:
     return Path(path).resolve().as_uri()
+
+
