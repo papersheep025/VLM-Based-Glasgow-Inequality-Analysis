@@ -54,16 +54,16 @@ def build_instruction(
     core_rules = (
         "Reason internally, but do not reveal reasoning. "
         "Use consistent visual cues across modalities when possible. "
-        "Output one valid JSON object only. All fields must always be present, even if empty. "
-        "Evidence must be a JSON object with keys streetview, satellite, and nightlight; each value must be a list of 3-5 short phrases (<8 words), or [] if missing. "
+        "Output one valid JSON object only. All fields must always be present, even if empty. Before outputting, verify that the JSON is complete and valid. "
+        "Evidence must be a JSON object with keys streetview, satellite, and nightlight; each value must be a list of 3-5 short phrases (<8 words). Do not leave evidence empty; if a modality is unavailable, return [] only for that modality. "
         "visual_indicators must contain density, greenery, lighting, infrastructure, building_condition, land_use_mix, cleanliness, accessibility, vehicle_presence, housing_type, and vacancy, each as a float between 0 and 1. "
         "Infer these indicators from the images only; do not derive them from labels or prior knowledge. "
         "Use 0 for very low presence, 0.5 for moderate presence, and 1 for very high presence. "
         "High density usually maps to 0.8-1.0; sparse buildings usually map to 0.2-0.4. "
         "confidence must be a float between 0 and 1; lower it when evidence is weak, modalities disagree, or features are unclear. "
-        "If unsure about any field, still return a best guess instead of leaving it empty. "
+        "If unsure about any field, still return a best guess instead of leaving it empty. Evidence should not be omitted, and should contain at least one short phrase for each available modality. "
         "Do not output evidence as a paragraph. "
-        "Do not use prior knowledge about the location."
+        "Do not use prior knowledge about the location. Nightlight evidence must describe only light intensity and spatial distribution. Do not infer object types or sources. Avoid brand names, place names, or semantic labels. Use only generic visual descriptions."
     )
     schema_example = (
         '{"predicted_quintile": 3, "confidence": 0.6, '
@@ -152,5 +152,7 @@ def build_prompt(
 
 def to_abs_uri(path: str | Path) -> str:
     return Path(path).resolve().as_uri()
+
+
 
 

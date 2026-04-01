@@ -117,7 +117,45 @@
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\aggregate_datazone_predictions.py --pred-jsonl outputs/predictions/qwen3_vl_plus_triple_test.jsonl --gold-jsonl dataset/streetview_satellite_ntl_aligned/vlm_data/triple_explain_test.jsonl --output-csv outputs/datazone_predictions.csv
+
+## 输出格式
+
+当前推理脚本保存的每一行结果，核心字段是 `prediction_json`。它的字段层级如下：
+
+```text
+prediction_json
+├─ predicted_rank_band
+├─ above_median_deprivation
+├─ confidence
+├─ visual_indicators
+│  ├─ density
+│  ├─ greenery
+│  ├─ lighting
+│  ├─ infrastructure
+│  ├─ building_condition
+│  ├─ land_use_mix
+│  ├─ cleanliness
+│  ├─ accessibility
+│  ├─ vehicle_presence
+│  ├─ housing_type
+│  └─ vacancy
+└─ evidence
+   ├─ streetview
+   ├─ satellite
+   └─ nightlight
 ```
+
+字段说明：
+
+- `predicted_rank_band`：预测的 rank 区间
+- `above_median_deprivation`：是否高于中位贫困水平
+- `confidence`：模型置信度，范围 0 到 1
+- `visual_indicators`：从图像中推理出的 11 个视觉指标
+- `evidence`：按模态拆分的短语证据
+- `streetview`：街景证据列表
+- `satellite`：卫星证据列表
+- `nightlight`：夜光证据列表
+
 
 ## 推荐的当前流程
 
@@ -154,5 +192,9 @@
 - smoke test 通过的样本
 - 可断点重跑的 API 预测结果
 - 样本级与 `datazone` 级分析表
+
+
+
+
 
 
