@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import argparse
@@ -35,7 +35,7 @@ def parse_args():
     parser.add_argument("--task", choices=("ordinal", "rank", "explain"), default="ordinal")
     parser.add_argument("--model", type=str, default=DEFAULT_MODEL)
     parser.add_argument("--base-url", type=str, default=DEFAULT_BASE_URL)
-    parser.add_argument("--max-new-tokens", type=int, default=256)
+    parser.add_argument("--max-new-tokens", type=int, default=512)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--api-key", type=str, default="")
     parser.add_argument("--max-samples", type=int, default=0, help="Only run the first N samples. 0 means all.")
@@ -101,13 +101,71 @@ def build_messages(sample: dict, input_mode: str, task: str) -> list[dict]:
 
 
 def extract_json(text: str) -> dict:
-    match = re.search(r"\{.*\}", text, flags=re.S)
-    if not match:
+    text = text.strip()
+    if not text:
         return {}
-    try:
-        return json.loads(match.group(0))
-    except Exception:
+
+    if text.startswith("{"):
+        try:
+            return json.loads(text)
+        except Exception:
+            pass
+
+    start = text.find("{")
+    if start < 0:
         return {}
+
+    depth = 0
+    in_string = False
+    escape = False
+    end = None
+    for idx, ch in enumerate(text[start:], start=start):
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+        else:
+            if ch == '"':
+                in_string = True
+            elif ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    end = idx + 1
+                    break
+
+    candidate = text[start:end] if end is not None else text[start:]
+
+    def _try_load(fragment: str) -> dict:
+        fragment = fragment.strip()
+        if not fragment:
+            return {}
+        open_braces = fragment.count('{')
+        close_braces = fragment.count('}')
+        open_brackets = fragment.count('[')
+        close_brackets = fragment.count(']')
+        repaired = fragment + ('}' * max(0, open_braces - close_braces)) + (']' * max(0, open_brackets - close_brackets))
+        try:
+            return json.loads(repaired)
+        except Exception:
+            return {}
+
+    parsed = _try_load(candidate)
+    if parsed:
+        return parsed
+
+    # If the model output was truncated, walk backward and try to recover the
+    # longest valid JSON prefix instead of dropping the whole sample.
+    for cut in range(len(candidate) - 1, 1, -1):
+        parsed = _try_load(candidate[:cut])
+        if parsed:
+            return parsed
+
+    return {}
 
 
 def _coerce_evidence(value):
@@ -140,7 +198,9 @@ def normalize_prediction_json(payload: dict) -> dict:
         pass
 
     evidence = payload.get("evidence")
-    if evidence is not None:
+    if isinstance(evidence, dict):
+        normalized["evidence"] = evidence
+    elif evidence is not None:
         normalized["evidence"] = _coerce_evidence(evidence)
     else:
         normalized["evidence"] = []
@@ -213,7 +273,10 @@ def load_processed_ids(path: Path) -> set[str]:
             except Exception:
                 continue
             row_id = row.get("id")
-            if row_id:
+            prediction = row.get("prediction_json")
+            if not row_id:
+                continue
+            if isinstance(prediction, dict) and prediction:
                 processed.add(str(row_id))
     return processed
 
@@ -267,3 +330,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
