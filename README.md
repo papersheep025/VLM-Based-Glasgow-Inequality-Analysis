@@ -1,80 +1,147 @@
-﻿# Glasgow 城市不平等 VLM 项目
+﻿# VLM Based Glasgow Inequality Analysis
 
-这是一个面向 Glasgow 城市不平等分析的多模态视觉语言模型项目。当前主线已经调整为：
+本项目使用视觉语言模型研究格拉斯哥城市不平等与贫困分布。
 
-- 先做街景、卫星、夜光的空间对齐
-- 再生成用于推理的 JSONL
-- 使用 `Qwen3-VL-Plus` API 做小批量或全量预测
-- 支持断点重跑，适合不能长时间开机的环境
+主流程：
+- 构建空间对齐表
+- 生成 VLM JSONL 文件
+- 用 Qwen3-VL-Plus 做全量 API 预览
+- 评估预测结果
+- 按 datazone 进行聚合分析
 
-## 当前目录结构
+
+## 项目结构
 
 - `dataset/streetview_dataset`
   - 原始街景图像
 - `dataset/satellite_dataset`
-  - 原始遥感数据
-  - `satellite_patches`：卫星 patch
-  - `satellite_ntl_patches`：夜光 patch
+  - 原始遥感 TIFF 
+  - `satellite_patches`遥感图像采样图片（256*256）
+  - `satellite_ntl_patches`夜光图像采样图片（512*512）
 - `dataset/streetview_satellite_aligned`
-  - 街景 + 卫星 对齐结果
+  - 街景 + 遥感双模态对齐结果
 - `dataset/streetview_ntl_aligned`
-  - 街景 + 夜光 对齐结果
+  - 街景 + 夜光双模态对齐结果
+- `dataset/satellite_ntl_aligned`
+  - 遥感 + 夜光双模态对齐结果
 - `dataset/streetview_satellite_ntl_aligned`
-  - 街景 + 卫星 + 夜光 三模态对齐结果
+  - 街景 + 遥感 + 夜光三模态对齐结果
 - `outputs/predictions`
-  - 模型预测输出
+  - API 预测预览和完整输出
 - `src/glasgow_vlm`
-  - prompt、数据集封装、指标等核心代码
+  - prompt、数据读取和指标计算等辅助代码
 
-## 环境安装
-
-如果你已经有 `.venv`，直接安装依赖：
+## 环境配置
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-## 先做空间对齐
+## 空间对齐
 
-### 1. 三模态空间对齐
+仓库提供四个空间对齐脚本：
+
+### 街景 + 遥感：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_streetview_prefix_satellite_alignment.py
+```
+
+### 街景 + 夜光：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_streetview_ntl_alignment.py
+```
+
+### 遥感 + 夜光：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_satellite_ntl_alignment.py
+```
+
+### 街景 + 遥感 + 夜光：
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\build_streetview_satellite_ntl_alignment.py
 ```
 
-会生成：
+这些脚本生成对齐 CSV 和摘要文件，并且不合并 SIMD 标签
 
-- `dataset/streetview_satellite_ntl_aligned/streetview_satellite_ntl_alignment.csv`
-- `dataset/streetview_satellite_ntl_aligned/streetview_satellite_ntl_alignment.jsonl`
-- `dataset/streetview_satellite_ntl_aligned/streetview_satellite_ntl_summary.json`
+## 生成 JSONL
 
-### 2. 生成纯空间对齐 JSONL
+`scripts/build_vlm_jsonl.py` 会把对齐 CSV 转成 VLM JSONL 文件。
 
-当前版本的 `scripts/build_vlm_jsonl.py` **不再合并 SIMD**，只做空间配对和 JSONL 生成。
+支持的 `--input-mode`：
+- `streetview`
+- `satellite`
+- `dual`
+- `satellite_ntl`
+- `triple`
+
+支持的 `--task`：
+- `explain`
+
+街景 + 遥感 explain 示例：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_vlm_jsonl.py --alignment-csv dataset/streetview_satellite_aligned/streetview_prefix_satellite_alignment.csv --output-dir dataset/streetview_satellite_aligned/vlm_data --input-mode dual --task explain
+```
+
+街景 + 夜光 explain 示例：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_vlm_jsonl.py --alignment-csv dataset/streetview_ntl_aligned/streetview_ntl_alignment.csv --output-dir dataset/streetview_ntl_aligned/vlm_data --input-mode dual --task explain
+```
+
+遥感 + 夜光 explain 示例：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_vlm_jsonl.py --alignment-csv dataset/satellite_ntl_aligned/satellite_ntl_alignment.csv --output-dir dataset/satellite_ntl_aligned/vlm_data --input-mode satellite_ntl --task explain
+```
+街景 + 遥感 + 夜光三模态 explain 示例：
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\build_vlm_jsonl.py --alignment-csv dataset/streetview_satellite_ntl_aligned/streetview_satellite_ntl_alignment.csv --output-dir dataset/streetview_satellite_ntl_aligned/vlm_data --input-mode triple --task explain
 ```
 
-会生成：
+## Smoke Test 检查链路能否跑通
 
-- `triple_explain_train.jsonl`
-- `triple_explain_val.jsonl`
-- `triple_explain_test.jsonl`
-- `triple_explain_all.jsonl`
-
-如果你想做双模态，把 `--input-mode triple` 改成 `dual`，并把 `--task explain` 保留即可。
-
-### 3. 做 smoke test
-
-`smoke_test_vlm_pipeline.py` 现在适配纯空间对齐版，不再强制要求 `answer_json`。
+对生成的 JSONL 做快速检查：
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\smoke_test_vlm_pipeline.py --jsonl dataset/streetview_satellite_ntl_aligned/vlm_data/triple_explain_train.jsonl --num-samples 5
 ```
 
-### 4. 小批量 API 预览
+smoke test 会检查：
+- 必需字段是否存在
+- 图像路径是否可读
+- prompt 是否可解析
+- 在当前“纯空间对齐”流程中，`answer_json` 是可选项
+
+## 跑小批量，检查输出格式和内容
+
+主推理脚本是 `scripts/predict_qwen3_vl_plus_api.py`，可以修改`--max-samples`的数量调整需要预览的样本个数
+
+### 街景 + 遥感
+
+```powershell
+.\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/streetview_satellite_aligned/vlm_data/dual_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_streetview_satellite_preview.jsonl --input-mode dual --task explain --max-samples 5
+```
+
+### 街景 + 夜光
+
+```powershell
+.\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/streetview_ntl_aligned/vlm_data/dual_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_streetview_ntl_preview.jsonl --input-mode dual --task explain --max-samples 5
+```
+
+### 遥感 + 夜光：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/satellite_ntl_aligned/vlm_data/satellite_ntl_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_satellite_ntl_preview.jsonl --input-mode satellite_ntl --task explain --max-samples 5
+```
+
+### 街景 + 遥感 + 夜光三模态：
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/streetview_satellite_ntl_aligned/vlm_data/triple_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_triple_preview.jsonl --input-mode triple --task explain --max-samples 5
@@ -82,119 +149,96 @@
 
 ## 全量运行
 
-如果小批量结果正常，就去掉 `--max-samples 5`：
+全量跑要去掉 `--max-samples`：
+
+### 街景 + 遥感：
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/streetview_satellite_ntl_aligned/vlm_data/triple_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_triple_test.jsonl --input-mode triple --task explain
+.\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/streetview_satellite_aligned/vlm_data/dual_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_streetview_satellite.jsonl --input-mode dual --task explain
 ```
 
-### 断点重跑
+### 街景 + 夜光：
 
-当前 `predict_qwen3_vl_plus_api.py` 支持断点重跑：
+```powershell
+.\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/streetview_ntl_aligned/vlm_data/dual_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_streetview_ntl.jsonl --input-mode dual --task explain
+```
 
-- 直接重新运行同一条命令即可
-- 脚本会自动读取已有输出文件中的 `id`
-- 已完成的样本会自动跳过
-- 追加写入未完成部分
+### 遥感 + 夜光：
 
-如果你想强制从头开始，加入 `--overwrite`：
+```powershell
+.\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/satellite_ntl_aligned/vlm_data/satellite_ntl_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_satellite_ntl.jsonl --input-mode satellite_ntl --task explain
+```
+
+### 街景 + 遥感 + 夜光三模态：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/streetview_satellite_ntl_aligned/vlm_data/triple_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_triple.jsonl --input-mode triple --task explain
+
+### 断点续跑
+
+`predict_qwen3_vl_plus_api.py` 支持断点续跑：
+
+- 已完成的 `id` 会自动跳过
+- 空或不完整的记录会重新尝试
+- 想从头开始可以加 `--overwrite`
+
+示例：
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/streetview_satellite_ntl_aligned/vlm_data/triple_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_triple_test.jsonl --input-mode triple --task explain --overwrite
 ```
+## Prompt 设计要点
 
-### 评估
+`src/glasgow_vlm/prompts.py` 定义了 prompt 模板。
 
-如果输出文件里包含预测字段，可以继续用评估脚本检查结果：
+当前 prompt 的目标：
+- 限定 `evidence` 的输出均为短语，大幅减少 token 使用
+- 要求结构化 evidence，分成 `streetview`, `satellite`, `nightlight` 分别记录
+- 要求模型从图像中推断 visual indicators
+- 避免 Datazone ID 泄漏，大模型读取 ID 信息后调取 SIMD 数据干扰正常分析
+
+
+## 预测JSON输出格式
+
+结构化结果保存在 `prediction_json` 中。
+
+字段层级如下：
+
+```text
+prediction_json
+- predicted_quintile or above_median_deprivation
+- predicted_rank_band
+- confidence
+- visual_indicators
+  - density
+  - greenery
+  - lighting
+  - infrastructure
+  - building_condition
+  - land_use_mix
+  - cleanliness
+  - accessibility
+  - vehicle_presence
+  - housing_type
+  - vacancy
+- evidence
+  - streetview
+  - satellite
+  - nightlight
+```
+## 评估
+
+对预测结果进行评估：
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\evaluate_predictions.py --gold-jsonl dataset/streetview_satellite_ntl_aligned/vlm_data/triple_explain_test.jsonl --pred-jsonl outputs/predictions/qwen3_vl_plus_triple_test.jsonl
 ```
 
-### 可选聚合
+## Datazone 聚合
 
-如果你希望把样本级结果汇总到 `datazone` 层，可以继续使用：
+按 datazone 聚合预测结果：
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\aggregate_datazone_predictions.py --pred-jsonl outputs/predictions/qwen3_vl_plus_triple_test.jsonl --gold-jsonl dataset/streetview_satellite_ntl_aligned/vlm_data/triple_explain_test.jsonl --output-csv outputs/datazone_predictions.csv
-
-## 输出格式
-
-当前推理脚本保存的每一行结果，核心字段是 `prediction_json`。它的字段层级如下：
-
-```text
-prediction_json
-├─ predicted_rank_band
-├─ above_median_deprivation
-├─ confidence
-├─ visual_indicators
-│  ├─ density
-│  ├─ greenery
-│  ├─ lighting
-│  ├─ infrastructure
-│  ├─ building_condition
-│  ├─ land_use_mix
-│  ├─ cleanliness
-│  ├─ accessibility
-│  ├─ vehicle_presence
-│  ├─ housing_type
-│  └─ vacancy
-└─ evidence
-   ├─ streetview
-   ├─ satellite
-   └─ nightlight
 ```
-
-字段说明：
-
-- `predicted_rank_band`：预测的 rank 区间
-- `above_median_deprivation`：是否高于中位贫困水平
-- `confidence`：模型置信度，范围 0 到 1
-- `visual_indicators`：从图像中推理出的 11 个视觉指标
-- `evidence`：按模态拆分的短语证据
-- `streetview`：街景证据列表
-- `satellite`：卫星证据列表
-- `nightlight`：夜光证据列表
-
-
-## 推荐的当前流程
-
-1. 先做三模态空间对齐
-2. 生成 `triple_explain_*.jsonl`
-3. 跑 smoke test
-4. 先做 `--max-samples 5` 的小批量 API 预览
-5. 如果没问题，再做全量预测
-6. 需要中断后恢复时，直接重跑同一命令即可
-
-## 提示词设计
-
-当前 `src/glasgow_vlm/prompts.py` 采用的是结构化输出风格：
-
-- 模型内部只做隐式推理
-- 输出只保留 JSON
-- `evidence` 是结构化对象
-- `visual_indicators` 需要模型根据图像推理
-- `explain` 任务会带有 `above_median_deprivation` 和 `predicted_rank_band`
-
-## 说明
-
-当前 `build_vlm_jsonl.py` 是**纯空间对齐版**，不再合并 SIMD 标签。也就是说：
-
-- 它适合做数据管线、prompt 和 API 推理测试
-- 如果你后面要重新做 `rank` 或 `ordinal` 的监督训练，需要再单独把 SIMD 标签接回去
-
-## 结果预期
-
-跑通后你会得到：
-
-- 空间对齐结果
-- 纯空间对齐 JSONL
-- smoke test 通过的样本
-- 可断点重跑的 API 预测结果
-- 样本级与 `datazone` 级分析表
-
-
-
-
-
 

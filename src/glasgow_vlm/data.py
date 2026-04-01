@@ -39,18 +39,25 @@ class GlasgowVLMJsonlDataset(Dataset):
         images: list[Image.Image] = []
         if self.input_mode in ("streetview", "dual", "triple"):
             images.append(self._load_image(record["streetview_path"]))
-        if self.input_mode in ("satellite", "dual", "triple"):
+        if self.input_mode in ("satellite", "dual", "triple", "satellite_ntl"):
             images.append(self._load_image(record["satellite_path"]))
-        if self.input_mode == "triple":
+        if self.input_mode in ("triple", "satellite_ntl"):
             ntl_path = record.get("ntl_path")
             if not ntl_path:
-                raise ValueError(f"Record {record.get('id')} is missing ntl_path for triple input mode")
+                raise ValueError(f"Record {record.get('id')} is missing ntl_path for {self.input_mode} input mode")
             images.append(self._load_image(ntl_path))
         secondary_modality = record.get("secondary_modality", "satellite")
         tertiary_modality = record.get("tertiary_modality")
-        modalities = ("satellite", secondary_modality)
         if self.input_mode == "triple":
             modalities = ("satellite", "ntl")
+        elif self.input_mode == "satellite_ntl":
+            modalities = ("ntl",)
+        elif self.input_mode == "dual" and secondary_modality == "ntl":
+            modalities = ("ntl",)
+        elif self.input_mode in ("satellite", "streetview"):
+            modalities = ()
+        else:
+            modalities = ("satellite", secondary_modality)
         return {
             "id": record["id"],
             "record": record,
@@ -61,6 +68,7 @@ class GlasgowVLMJsonlDataset(Dataset):
                 secondary_modality=secondary_modality,
                 tertiary_modality=tertiary_modality,
                 modalities=modalities,
+                primary_modality=("satellite" if self.input_mode == "satellite_ntl" else "streetview"),
             ),
             "answer": record.get("answer_json") or build_answer(record, self.task),
         }
