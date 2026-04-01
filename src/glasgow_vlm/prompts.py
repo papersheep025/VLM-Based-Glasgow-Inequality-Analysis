@@ -39,11 +39,22 @@ def describe_modalities(modalities: tuple[str, ...]) -> str:
     return ", ".join(f"the {label}" for label in labels[:-1]) + f", and the {labels[-1]}"
 
 
+def primary_modality_label(modality: str = "streetview") -> str:
+    if modality == "streetview":
+        return "street-view image"
+    if modality == "satellite":
+        return "satellite image"
+    if modality == "ntl":
+        return "nightlight image"
+    return f"{modality.replace('_', ' ')} image"
+
+
 def build_instruction(
     task: str = "ordinal",
     secondary_modality: str = "satellite",
     tertiary_modality: str | None = None,
     modalities: tuple[str, ...] | None = None,
+    primary_modality: str = "streetview",
 ) -> str:
     if modalities is None:
         resolved_modalities = ("satellite", secondary_modality)
@@ -51,6 +62,7 @@ def build_instruction(
             resolved_modalities = resolved_modalities + (tertiary_modality,)
         modalities = tuple(dict.fromkeys(mod for mod in resolved_modalities if mod))
     modality_phrase = describe_modalities(modalities)
+    primary_phrase = primary_modality_label(primary_modality)
     core_rules = (
         "Reason internally, but do not reveal reasoning. "
         "Use consistent visual cues across modalities when possible. "
@@ -76,25 +88,19 @@ def build_instruction(
     )
     if task == "ordinal":
         return (
-            f"Predict the deprivation quintile for this location using the street-view image together with {modality_phrase}. "
+            f"Predict the deprivation quintile for this location using the {primary_phrase} together with {modality_phrase}. "
             f"{core_rules} Return JSON with fields: predicted_quintile, confidence, evidence, visual_indicators. "
-            f"Example JSON: {schema_example}"
-        )
-    if task == "rank":
-        return (
-            f"Predict the rank band for this location using the street-view image together with {modality_phrase}. "
-            f"{core_rules} Return JSON with fields: predicted_rank_band, confidence, evidence, visual_indicators. "
             f"Example JSON: {schema_example}"
         )
     if task == "explain":
         return (
-            f"Describe the shared visual cues across the street-view image together with {modality_phrase}, "
+            f"Describe the shared visual cues across the {primary_phrase} together with {modality_phrase}, "
             "then predict whether the location is above or below the median deprivation level. "
             f"{core_rules} Return JSON with fields: above_median_deprivation, predicted_rank_band, confidence, evidence, visual_indicators. "
             f"Example JSON: {schema_example}"
         )
     return (
-        f"Analyze the location using {modality_phrase}. {core_rules} Return JSON with fields: predicted_quintile, confidence, evidence, visual_indicators. "
+        f"Analyze the location using the {primary_phrase} together with {modality_phrase}. {core_rules} Return JSON with fields: predicted_quintile, confidence, evidence, visual_indicators. "
         f"Example JSON: {schema_example}"
     )
 
@@ -102,18 +108,7 @@ def build_instruction(
 def build_answer(record: dict, task: str = "ordinal") -> str:
     quintile = record.get("deprivation_quintile")
     rank = record.get("deprivation_rank")
-    if task == "rank":
-        band = "unknown"
-        if isinstance(rank, (int, float)):
-            rank_int = int(rank)
-            low = max(1, (rank_int // 1000) * 1000)
-            high = min(5000, low + 999)
-            band = f"{low}-{high}"
-        payload = {
-            "predicted_rank_band": band,
-            "confidence": 1.0,
-        }
-    elif task == "explain":
+    if task == "explain":
         band = "unknown"
         if isinstance(rank, (int, float)):
             rank_int = int(rank)
@@ -132,13 +127,13 @@ def build_answer(record: dict, task: str = "ordinal") -> str:
         }
     return json.dumps(payload, ensure_ascii=False)
 
-
 def build_prompt(
     record: dict,
     task: str = "ordinal",
     secondary_modality: str = "satellite",
     tertiary_modality: str | None = None,
     modalities: tuple[str, ...] | None = None,
+    primary_modality: str = "streetview",
 ) -> str:
     if modalities is None:
         resolved_modalities = ("satellite", secondary_modality)
@@ -147,11 +142,12 @@ def build_prompt(
         modalities = tuple(dict.fromkeys(mod for mod in resolved_modalities if mod))
     modality_phrase = describe_modalities(modalities)
     location = "Location metadata unavailable."
-    return f"{build_instruction(task, secondary_modality, tertiary_modality, modalities)} {location} Image modalities: {modality_phrase}."
+    return f"{build_instruction(task, secondary_modality, tertiary_modality, modalities, primary_modality)} {location} Image modalities: {modality_phrase}."
 
 
 def to_abs_uri(path: str | Path) -> str:
     return Path(path).resolve().as_uri()
+
 
 
 

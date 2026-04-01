@@ -31,8 +31,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run Qwen3-VL-Plus via DashScope OpenAI-compatible API.")
     parser.add_argument("--input-jsonl", type=Path, required=True)
     parser.add_argument("--output-jsonl", type=Path, required=True)
-    parser.add_argument("--input-mode", choices=("streetview", "satellite", "dual", "triple"), default="dual")
-    parser.add_argument("--task", choices=("ordinal", "rank", "explain"), default="ordinal")
+    parser.add_argument("--input-mode", choices=("streetview", "satellite", "dual", "satellite_ntl", "triple"), default="dual")
+    parser.add_argument("--task", choices=("ordinal", "explain"), default="ordinal")
     parser.add_argument("--model", type=str, default=DEFAULT_MODEL)
     parser.add_argument("--base-url", type=str, default=DEFAULT_BASE_URL)
     parser.add_argument("--max-new-tokens", type=int, default=512)
@@ -70,24 +70,25 @@ def encode_image_data_url(path: str | Path) -> str:
 
 def build_messages(sample: dict, input_mode: str, task: str) -> list[dict]:
     content: list[dict] = [{"type": "text", "text": sample["prompt"]}]
+    record = sample["record"]
     if input_mode in ("streetview", "dual", "triple"):
         content.append(
             {
                 "type": "image_url",
-                "image_url": {"url": encode_image_data_url(sample["record"]["streetview_path"])},
+                "image_url": {"url": encode_image_data_url(record["streetview_path"])},
             }
         )
-    if input_mode in ("satellite", "dual", "triple"):
+    if input_mode in ("satellite", "dual", "triple", "satellite_ntl"):
         content.append(
             {
                 "type": "image_url",
-                "image_url": {"url": encode_image_data_url(sample["record"]["satellite_path"])},
+                "image_url": {"url": encode_image_data_url(record["satellite_path"])},
             }
         )
-    if input_mode == "triple":
-        ntl_path = sample["record"].get("ntl_path")
+    if input_mode in ("satellite_ntl", "triple"):
+        ntl_path = record.get("ntl_path")
         if not ntl_path:
-            raise ValueError(f"Record {sample['id']} is missing ntl_path for triple input mode")
+            raise ValueError(f"Record {sample['id']} is missing ntl_path for {input_mode} input mode")
         content.append(
             {
                 "type": "image_url",
@@ -330,6 +331,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 

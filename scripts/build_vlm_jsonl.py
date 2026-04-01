@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import argparse
@@ -32,8 +32,8 @@ def parse_args():
     )
     parser.add_argument("--output-dir", type=Path, default=Path("dataset") / "vlm_data")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--input-mode", choices=("streetview", "satellite", "dual", "triple"), default="dual")
-    parser.add_argument("--task", choices=("ordinal", "rank", "explain"), default="ordinal")
+    parser.add_argument("--input-mode", choices=("streetview", "satellite", "dual", "satellite_ntl", "triple"), default="dual")
+    parser.add_argument("--task", choices=("ordinal", "explain"), default="ordinal")
     parser.add_argument(
         "--secondary-modality",
         choices=("satellite", "ntl"),
@@ -64,6 +64,14 @@ def to_abs(path: str | Path) -> str:
 def resolve_path_like(alignment_csv: Path, value: str | Path) -> str:
     candidate = Path(value)
     if candidate.is_absolute():
+        if candidate.exists():
+            return str(candidate.resolve())
+        parts = candidate.parts
+        if "dataset" in parts:
+            suffix = Path(*parts[parts.index("dataset"):])
+            mapped = (ROOT / suffix).resolve()
+            if mapped.exists():
+                return str(mapped)
         return str(candidate.resolve())
 
     base_candidate = (alignment_csv.parent / candidate).resolve()
@@ -78,6 +86,18 @@ def first_present(row: pd.Series, *keys: str, default=None):
         if key in row.index and pd.notna(row[key]):
             return row[key]
     return default
+
+
+def prompt_config_for_mode(input_mode: str, secondary_modality: str) -> tuple[str, str, str | None, tuple[str, ...]]:
+    if input_mode == "satellite_ntl":
+        return "satellite", "ntl", None, ("ntl",)
+    if input_mode == "triple":
+        return "streetview", secondary_modality, "ntl", ("satellite", "ntl")
+    if input_mode == "satellite":
+        return "satellite", secondary_modality, None, ()
+    if input_mode == "streetview":
+        return "streetview", secondary_modality, None, ()
+    return "streetview", secondary_modality, None, (secondary_modality,)
 
 
 def read_alignment(alignment_csv: Path) -> pd.DataFrame:
@@ -117,6 +137,7 @@ def make_records(df: pd.DataFrame, task: str, input_mode: str, secondary_modalit
         sample_id = row.get("image") if "image" in df.columns else row.get("prefix") or row.get("streetview_source_image")
         pixel_row = first_present(row, "pixel_row", "satellite_pixel_row", "pixel_row_satellite", default=None)
         pixel_col = first_present(row, "pixel_col", "satellite_pixel_col", "pixel_col_satellite", default=None)
+        primary_modality, prompt_secondary_modality, tertiary_modality, prompt_modalities = prompt_config_for_mode(input_mode, secondary_modality)
         record = {
             "id": f"{row['datazone']}__{sample_id}",
             "datazone": row["datazone"],
@@ -127,7 +148,7 @@ def make_records(df: pd.DataFrame, task: str, input_mode: str, secondary_modalit
             "streetview_path": row["streetview_path"],
             "satellite_path": row["satellite_path"],
             "ntl_path": row["ntl_path"] if "ntl_path" in df.columns and pd.notna(row.get("ntl_path")) else None,
-            "secondary_modality": secondary_modality,
+            "secondary_modality": prompt_secondary_modality,
             "input_mode": input_mode,
             "prompt": build_prompt(
                 {
@@ -136,14 +157,15 @@ def make_records(df: pd.DataFrame, task: str, input_mode: str, secondary_modalit
                     "lon": row["lon"],
                 },
                 task,
-                secondary_modality=secondary_modality,
-                tertiary_modality="ntl" if input_mode == "triple" else None,
-                modalities=("satellite", "ntl") if input_mode == "triple" else (secondary_modality,),
+                secondary_modality=prompt_secondary_modality,
+                tertiary_modality=tertiary_modality,
+                modalities=prompt_modalities,
+                primary_modality=primary_modality,
             ),
             "task": task,
         }
-        if input_mode == "triple":
-            record["tertiary_modality"] = "ntl"
+        if tertiary_modality:
+            record["tertiary_modality"] = tertiary_modality
         records.append(record)
     return records
 
@@ -246,3 +268,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
