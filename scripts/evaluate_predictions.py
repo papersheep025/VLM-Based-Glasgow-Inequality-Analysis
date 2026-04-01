@@ -56,7 +56,7 @@ def main():
             continue
         pred_text = row.get("prediction_text", "")
         pred_json = row.get("prediction_json", {})
-        pred_q = pred_json.get("predicted_quintile")
+        pred_q = pred_json.get("predicted_quintile") if isinstance(pred_json, dict) else None
         if pred_q is None:
             pred_q = extract_int(str(pred_text))
         if pred_q is None:

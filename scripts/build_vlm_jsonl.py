@@ -2,11 +2,10 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import random
-import sys
 import shutil
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,8 +14,7 @@ if str(ROOT / "src") not in sys.path:
 
 import pandas as pd
 
-from glasgow_vlm.prompts import build_answer, build_prompt
-from glasgow_vlm.splits import stratified_group_split
+from glasgow_vlm.prompts import build_prompt
 
 
 def parse_args():
@@ -30,6 +28,7 @@ def parse_args():
         "--simd-csv",
         type=Path,
         default=Path("SIMD") / "simd2020_withgeog" / "simd2020_withinds.csv",
+        help="Deprecated and ignored. Spatial alignment no longer merges SIMD labels.",
     )
     parser.add_argument("--output-dir", type=Path, default=Path("dataset") / "vlm_data")
     parser.add_argument("--seed", type=int, default=42)
@@ -81,11 +80,8 @@ def first_present(row: pd.Series, *keys: str, default=None):
     return default
 
 
-def read_alignment(alignment_csv: Path, simd_csv: Path) -> pd.DataFrame:
-    align = pd.read_csv(alignment_csv)
-    simd = pd.read_csv(simd_csv)
-    simd = simd[["Data_Zone", "SIMD2020v2_Rank", "SIMD2020v2_Quintile"]].copy()
-    df = align.merge(simd, left_on="datazone", right_on="Data_Zone", how="left")
+def read_alignment(alignment_csv: Path) -> pd.DataFrame:
+    df = pd.read_csv(alignment_csv)
     if "satellite_patch" not in df.columns and "satellite_path" in df.columns:
         df = df.rename(columns={"satellite_path": "satellite_patch"})
     if "streetview_path" not in df.columns:
@@ -131,36 +127,64 @@ def make_records(df: pd.DataFrame, task: str, input_mode: str, secondary_modalit
             "streetview_path": row["streetview_path"],
             "satellite_path": row["satellite_path"],
             "ntl_path": row["ntl_path"] if "ntl_path" in df.columns and pd.notna(row.get("ntl_path")) else None,
-            "deprivation_rank": int(row["SIMD2020v2_Rank"]) if pd.notna(row["SIMD2020v2_Rank"]) else None,
-            "deprivation_quintile": int(row["SIMD2020v2_Quintile"]) if pd.notna(row["SIMD2020v2_Quintile"]) else None,
             "secondary_modality": secondary_modality,
-            "answer_json": build_answer(
-                {
-                    "deprivation_rank": row["SIMD2020v2_Rank"],
-                    "deprivation_quintile": row["SIMD2020v2_Quintile"],
-                },
-                task,
-            ),
+            "input_mode": input_mode,
             "prompt": build_prompt(
                 {
                     "datazone": row["datazone"],
                     "lat": row["lat"],
                     "lon": row["lon"],
-                    "deprivation_quintile": row["SIMD2020v2_Quintile"],
-                    "deprivation_rank": row["SIMD2020v2_Rank"],
                 },
                 task,
                 secondary_modality=secondary_modality,
                 tertiary_modality="ntl" if input_mode == "triple" else None,
-                modalities=("satellite", "ntl") if input_mode == "triple" else None,
+                modalities=("satellite", "ntl") if input_mode == "triple" else (secondary_modality,),
             ),
             "task": task,
-            "input_mode": input_mode,
         }
         if input_mode == "triple":
             record["tertiary_modality"] = "ntl"
         records.append(record)
     return records
+
+
+def group_split(
+    records: list[dict],
+    group_key: str = "datazone",
+    train_ratio: float = 0.8,
+    val_ratio: float = 0.1,
+    test_ratio: float = 0.1,
+    seed: int = 42,
+):
+    if abs((train_ratio + val_ratio + test_ratio) - 1.0) > 1e-6:
+        raise ValueError("Split ratios must sum to 1.0")
+
+    groups: dict[object, list[dict]] = {}
+    for record in records:
+        group = record.get(group_key)
+        groups.setdefault(group, []).append(record)
+
+    group_ids = list(groups.keys())
+    rng = random.Random(seed)
+    rng.shuffle(group_ids)
+
+    n_groups = len(group_ids)
+    n_train = int(round(n_groups * train_ratio))
+    n_val = int(round(n_groups * val_ratio))
+    n_train = min(n_train, n_groups)
+    n_val = min(n_val, max(0, n_groups - n_train))
+
+    train_groups = set(group_ids[:n_train])
+    val_groups = set(group_ids[n_train : n_train + n_val])
+    test_groups = set(group_ids[n_train + n_val :])
+
+    def collect(selected_groups: set[object]) -> list[dict]:
+        output: list[dict] = []
+        for group in selected_groups:
+            output.extend(groups[group])
+        return output
+
+    return collect(train_groups), collect(val_groups), collect(test_groups)
 
 
 def write_jsonl(path: Path, records: list[dict]) -> None:
@@ -172,7 +196,7 @@ def write_jsonl(path: Path, records: list[dict]) -> None:
 
 def main():
     args = parse_args()
-    df = read_alignment(args.alignment_csv, args.simd_csv)
+    df = read_alignment(args.alignment_csv)
     if args.dedupe_satellite:
         df = dedupe_alignment_df(df, args.dedupe_by)
         patch_size = int(df["patch_size_px"].iloc[0]) if "patch_size_px" in df.columns and len(df) else 256
@@ -186,10 +210,9 @@ def main():
 
     records = make_records(df, args.task, args.input_mode, args.secondary_modality)
 
-    train, val, test = stratified_group_split(
+    train, val, test = group_split(
         records,
         group_key="datazone",
-        label_key="deprivation_quintile",
         train_ratio=args.train_ratio,
         val_ratio=args.val_ratio,
         test_ratio=args.test_ratio,
@@ -206,6 +229,7 @@ def main():
     summary = {
         "alignment_csv": str(args.alignment_csv),
         "simd_csv": str(args.simd_csv),
+        "simd_merged": False,
         "input_mode": args.input_mode,
         "task": args.task,
         "dedupe_satellite": bool(args.dedupe_satellite),

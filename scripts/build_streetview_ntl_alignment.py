@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import argparse
@@ -54,7 +54,7 @@ def parse_args():
     parser.add_argument(
         "--patch-size",
         type=int,
-        default=256,
+        default=512,
         help="Nightlight patch size in pixels. Must be a positive even number.",
     )
     parser.add_argument(
@@ -255,3 +255,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

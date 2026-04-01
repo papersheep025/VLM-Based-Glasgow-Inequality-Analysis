@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import argparse
@@ -11,6 +11,10 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
+
+STREETVIEW_DIR = ROOT / "dataset" / "streetview_dataset" / "images"
+SATELLITE_PATCHES_DIR = ROOT / "dataset" / "satellite_dataset" / "satellite_patches"
+NTL_PATCHES_DIR = ROOT / "dataset" / "satellite_dataset" / "satellite_ntl_patches"
 
 
 def parse_args() -> argparse.Namespace:
@@ -35,42 +39,33 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def resolve_path_like(base_dir: Path, value: str | Path) -> str:
-    candidate = Path(value)
-    if candidate.is_absolute():
-        return str(candidate.resolve())
-    joined = (base_dir / candidate).resolve()
-    if joined.exists():
-        return str(joined)
-    return str(candidate.resolve())
-
-
-def normalize_satellite_df(path: Path) -> pd.DataFrame:
+def load_satellite_df(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path)
     if "satellite_path" not in df.columns and "satellite_patch" in df.columns:
         df = df.rename(columns={"satellite_patch": "satellite_path"})
-    df["streetview_path"] = df["streetview_path"].apply(lambda p: resolve_path_like(path.parent, p))
-    df["satellite_path"] = df["satellite_path"].apply(lambda p: resolve_path_like(path.parent, p))
+    df["streetview_path"] = df["image"].apply(lambda name: str((STREETVIEW_DIR / Path(name)).resolve()))
+    df["satellite_path"] = df["satellite_path"].apply(lambda p: str((SATELLITE_PATCHES_DIR / Path(p).name).resolve()))
     return df
 
 
-def normalize_ntl_df(path: Path) -> pd.DataFrame:
+def load_ntl_df(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path)
     if "ntl_path" not in df.columns and "satellite_patch" in df.columns:
         df = df.rename(columns={"satellite_patch": "ntl_path"})
-    df["streetview_path"] = df["streetview_path"].apply(lambda p: resolve_path_like(path.parent, p))
-    df["ntl_path"] = df["ntl_path"].apply(lambda p: resolve_path_like(path.parent, p))
+    df["streetview_path"] = df["image"].apply(lambda name: str((STREETVIEW_DIR / Path(name)).resolve()))
+    df["ntl_path"] = df["ntl_path"].apply(lambda p: str((NTL_PATCHES_DIR / Path(p).name).resolve()))
     return df
 
 
 def main() -> None:
     args = parse_args()
-    sat_df = normalize_satellite_df(args.satellite_alignment_csv)
-    ntl_df = normalize_ntl_df(args.ntl_alignment_csv)
+    sat_df = load_satellite_df(args.satellite_alignment_csv)
+    ntl_df = load_ntl_df(args.ntl_alignment_csv)
 
+    merge_keys = ["image", "datazone", "mapillary_id", "lat", "lon"]
     merged = sat_df.merge(
         ntl_df,
-        on=["image", "streetview_path", "datazone", "mapillary_id", "lat", "lon"],
+        on=merge_keys,
         how="inner",
         suffixes=("_satellite", "_ntl"),
     )
@@ -84,7 +79,7 @@ def main() -> None:
     output = pd.DataFrame(
         {
             "image": merged["image"],
-            "streetview_path": merged["streetview_path"],
+            "streetview_path": merged["streetview_path_satellite"],
             "streetview_exists": merged.get("streetview_exists_satellite", merged.get("streetview_exists", True)),
             "datazone": merged["datazone"],
             "mapillary_id": merged["mapillary_id"],

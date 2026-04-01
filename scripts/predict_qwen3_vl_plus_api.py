@@ -35,10 +35,12 @@ def parse_args():
     parser.add_argument("--task", choices=("ordinal", "rank", "explain"), default="ordinal")
     parser.add_argument("--model", type=str, default=DEFAULT_MODEL)
     parser.add_argument("--base-url", type=str, default=DEFAULT_BASE_URL)
-    parser.add_argument("--max-new-tokens", type=int, default=128)
+    parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--api-key", type=str, default="")
     parser.add_argument("--max-samples", type=int, default=0, help="Only run the first N samples. 0 means all.")
+    parser.add_argument("--resume", action="store_true", help="Resume from an existing output JSONL by skipping completed ids.")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite any existing output JSONL and start from scratch.")
     return parser.parse_args()
 
 
@@ -108,6 +110,44 @@ def extract_json(text: str) -> dict:
         return {}
 
 
+def _coerce_evidence(value):
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        return value.strip()
+    return []
+
+
+def normalize_prediction_json(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        return {}
+
+    normalized: dict[str, object] = {}
+    if "predicted_quintile" in payload:
+        normalized["predicted_quintile"] = payload["predicted_quintile"]
+    if "predicted_rank_band" in payload:
+        normalized["predicted_rank_band"] = payload["predicted_rank_band"]
+    if "above_median_deprivation" in payload:
+        normalized["above_median_deprivation"] = payload["above_median_deprivation"]
+    if isinstance(payload.get("visual_indicators"), dict):
+        normalized["visual_indicators"] = payload["visual_indicators"]
+
+    normalized["confidence"] = 0.0
+    confidence = payload.get("confidence", 0.0)
+    try:
+        normalized["confidence"] = float(confidence)
+    except Exception:
+        pass
+
+    evidence = payload.get("evidence")
+    if evidence is not None:
+        normalized["evidence"] = _coerce_evidence(evidence)
+    else:
+        normalized["evidence"] = []
+
+    return normalized
+
+
 def call_model(base_url: str, api_key: str, model: str, messages: list[dict], max_new_tokens: int, temperature: float) -> str:
     url = f"{base_url.rstrip('/')}/chat/completions"
     payload = {
@@ -159,6 +199,25 @@ def verify_api_connection(base_url: str, api_key: str, model: str) -> None:
     print(f"Response: {text}")
 
 
+def load_processed_ids(path: Path) -> set[str]:
+    processed: set[str] = set()
+    if not path.exists():
+        return processed
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except Exception:
+                continue
+            row_id = row.get("id")
+            if row_id:
+                processed.add(str(row_id))
+    return processed
+
+
 def main():
     args = parse_args()
     api_key = get_api_key(args)
@@ -167,11 +226,24 @@ def main():
     samples = dataset.records[: args.max_samples] if args.max_samples and args.max_samples > 0 else dataset.records
 
     args.output_jsonl.parent.mkdir(parents=True, exist_ok=True)
-    with open(args.output_jsonl, "w", encoding="utf-8") as f:
+    resume_enabled = (args.resume or args.output_jsonl.exists()) and not args.overwrite
+    processed_ids = load_processed_ids(args.output_jsonl) if resume_enabled else set()
+    mode = "a" if resume_enabled and args.output_jsonl.exists() else "w"
+    skipped = 0
+    written = 0
+
+    with open(args.output_jsonl, mode, encoding="utf-8") as f:
         print(f"Loaded {len(samples)} sample(s) from {args.input_jsonl}")
+        if processed_ids:
+            print(f"Resuming from existing output file; already processed {len(processed_ids)} id(s).")
         for idx, record in enumerate(samples, start=1):
+            sample_id = str(record["id"])
+            if sample_id in processed_ids:
+                skipped += 1
+                print(f"[{idx}/{len(samples)}] Skipping already processed {sample_id}")
+                continue
             sample = {
-                "id": record["id"],
+                "id": sample_id,
                 "record": record,
                 "prompt": record.get("prompt", ""),
             }
@@ -182,13 +254,15 @@ def main():
                 "id": sample["id"],
                 "datazone": sample["record"]["datazone"],
                 "prediction_text": text,
-                "prediction_json": extract_json(text),
+                "prediction_json": normalize_prediction_json(extract_json(text)),
                 "model": args.model,
             }
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
             f.flush()
+            written += 1
 
     print(f"Saved predictions to {args.output_jsonl}")
+    print(f"Written {written} new sample(s); skipped {skipped} existing sample(s).")
 
 
 if __name__ == "__main__":
