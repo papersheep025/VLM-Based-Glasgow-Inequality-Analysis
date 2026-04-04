@@ -54,7 +54,7 @@ def parse_args():
     parser.add_argument(
         "--patch-size",
         type=int,
-        default=512,
+        default=256,
         help="Nightlight patch size in pixels. Must be a positive even number.",
     )
     parser.add_argument(
@@ -255,4 +255,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

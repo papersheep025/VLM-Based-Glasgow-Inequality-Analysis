@@ -65,10 +65,11 @@ def main():
         raise ValueError(f"Alignment CSV missing required columns: {sorted(missing)}")
 
     alignment = alignment.copy()
+    patch_size = int(alignment["patch_size_px"].iloc[0]) if "patch_size_px" in alignment.columns and len(alignment) else 732
     alignment["prefix"] = alignment["image"].astype(str).apply(prefix_from_image)
     alignment["streetview_path"] = alignment["streetview_path"].apply(lambda p: str(resolve_path(p, ROOT)))
-    alignment["satellite_patch"] = alignment["prefix"].apply(
-        lambda p: str((args.prefix_dedup_dir / "satellite_patches" / f"{p}.png").resolve())
+    alignment["satellite_patch"] = alignment["image"].astype(str).apply(
+        lambda name: str((args.prefix_dedup_dir / "satellite_patches" / f"{Path(name).stem}_satellite_{patch_size}.png").resolve())
     )
     alignment["satellite_exists"] = alignment["satellite_patch"].apply(lambda p: Path(p).exists())
     alignment["streetview_exists"] = alignment["streetview_path"].apply(lambda p: Path(p).exists())
