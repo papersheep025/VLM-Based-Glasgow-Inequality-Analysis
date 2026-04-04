@@ -47,7 +47,7 @@ def parse_args():
     parser.add_argument(
         "--patch-size",
         type=int,
-        default=256,
+        default=732,
         help="Satellite patch size in pixels. Must be a positive even number.",
     )
     parser.add_argument(

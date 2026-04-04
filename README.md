@@ -15,8 +15,8 @@
   - 原始街景图像
 - `dataset/satellite_dataset`
   - 原始遥感 TIFF 和派生 patch
-  - `satellite_patches` 遥感图像采样图片（256*256）
-  - `satellite_ntl_patches` 夜光图像采样图片（512*512）
+  - `satellite_patches` 遥感图像采样图片（732*732，按街景图片名命名）
+  - `satellite_ntl_patches` 夜光图像采样图片（256*256，按街景图片名命名）
 - `dataset/streetview_satellite_aligned`
   - 街景 + 遥感双模态对齐结果
 - `dataset/streetview_ntl_aligned`
@@ -422,5 +422,3 @@ inequality_index_d = sum_j (w_j * x_d,j) / sum_j w_j
 ```powershell
 .\.venv\Scripts\python.exe scripts\aggregate_datazone_predictions.py --pred-jsonl outputs/predictions/qwen3_vl_plus_triple_test.jsonl --gold-jsonl dataset/streetview_satellite_ntl_aligned/vlm_data/triple_explain_test.jsonl --output-csv outputs/datazone_predictions.csv
 ```
-
-
