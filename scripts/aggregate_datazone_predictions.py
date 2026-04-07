@@ -48,7 +48,6 @@ def main():
                 "id": row["id"],
                 "datazone": gold_row["datazone"],
                 "predicted_quintile": pred.get("predicted_quintile"),
-                "predicted_rank_band": pred.get("predicted_rank_band"),
                 "prediction_text": row.get("prediction_text"),
                 "lat": gold_row.get("lat"),
                 "lon": gold_row.get("lon"),
@@ -83,4 +82,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

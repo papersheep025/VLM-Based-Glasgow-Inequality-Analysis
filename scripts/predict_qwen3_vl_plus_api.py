@@ -184,19 +184,8 @@ def normalize_prediction_json(payload: dict) -> dict:
     normalized: dict[str, object] = {}
     if "predicted_quintile" in payload:
         normalized["predicted_quintile"] = payload["predicted_quintile"]
-    if "predicted_rank_band" in payload:
-        normalized["predicted_rank_band"] = payload["predicted_rank_band"]
-    if "above_median_deprivation" in payload:
-        normalized["above_median_deprivation"] = payload["above_median_deprivation"]
     if isinstance(payload.get("visual_indicators"), dict):
         normalized["visual_indicators"] = payload["visual_indicators"]
-
-    normalized["confidence"] = 0.0
-    confidence = payload.get("confidence", 0.0)
-    try:
-        normalized["confidence"] = float(confidence)
-    except Exception:
-        pass
 
     evidence = payload.get("evidence")
     if isinstance(evidence, dict):
@@ -331,7 +320,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 
