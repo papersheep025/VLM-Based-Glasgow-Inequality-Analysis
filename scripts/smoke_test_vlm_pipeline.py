@@ -85,7 +85,7 @@ def main():
         if "answer_json" in row and row["answer_json"] not in (None, ""):
             try:
                 answer = json.loads(row["answer_json"])
-                if "predicted_quintile" not in answer and "predicted_rank_band" not in answer and "above_median_deprivation" not in answer:
+                if row.get("task") == "ordinal" and "predicted_quintile" not in answer:
                     errors.append(f"Sample {i}: answer_json does not contain expected prediction field")
             except Exception as exc:
                 errors.append(f"Sample {i}: invalid answer_json: {exc}")
@@ -101,4 +101,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

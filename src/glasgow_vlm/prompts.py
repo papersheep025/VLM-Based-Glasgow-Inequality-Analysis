@@ -5,8 +5,12 @@ from pathlib import Path
 
 
 SYSTEM_PROMPT = (
-    "You are a geospatial inequality analyst. "
-    "Infer deprivation from visual cues. "
+    "You are a geospatial inequality analyst specialising in urban deprivation assessment in the United Kingdom. "
+    "You assess deprivation by observing visual cues such as building fabric, street maintenance, "
+    "commercial activity, environmental quality, and signs of disorder — "
+    "consistent with frameworks such as the Scottish Index of Multiple Deprivation (SIMD). "
+    "Infer deprivation from visual evidence in the provided images only. "
+    "Do not use prior knowledge about specific locations, place names, or regional stereotypes. "
     "Think step-by-step internally but do not reveal reasoning. "
     "Return JSON only."
 )
@@ -68,62 +72,65 @@ def build_instruction(
         "Use consistent visual cues across modalities when possible. "
         "Output one valid JSON object only. All fields must always be present, even if empty. Before outputting, verify that the JSON is complete and valid. "
         "Evidence must be a JSON object with keys streetview, satellite, and nightlight; each value must be a list of 3-5 short phrases (<8 words). Do not leave evidence empty; if a modality is unavailable, return [] only for that modality. "
-        "visual_indicators must contain density, greenery, lighting, infrastructure, building_condition, land_use_mix, cleanliness, accessibility, vehicle_presence, housing_type, and vacancy, each as a float between 0 and 1. "
+        "visual_indicators must contain exactly these 15 keys: density, greenery, lighting, infrastructure, building_condition, land_use_mix, cleanliness, accessibility, vehicle_presence, housing_type, vacancy, commercial_activity, industrial_presence, graffiti_vandalism, security_features; each as a float between 0 and 1. "
         "Infer these indicators from the images only; do not derive them from labels or prior knowledge. "
         "Use 0 for very low presence, 0.5 for moderate presence, and 1 for very high presence. "
-        "High density usually maps to 0.8-1.0; sparse buildings usually map to 0.2-0.4. "
-        "confidence must be a float between 0 and 1; lower it when evidence is weak, modalities disagree, or features are unclear. "
+        "Calibration anchors: "
+        "density: 0=open fields/sparse buildings, 0.8-1.0=dense urban. "
+        "commercial_activity: 0=no shops/abandoned, 0.5=some retail, 1=active high street. "
+        "industrial_presence: 0=no industrial land, 1=warehouses/factories dominate (infer from satellite). "
+        "graffiti_vandalism: 0=no visible graffiti or damage, 0.5=scattered tags, 1=extensive vandalism (infer from street-view). "
+        "security_features: 0=no visible security measures, 0.5=some bars or cameras, 1=heavy fortification (infer from street-view). "
+        "graffiti_vandalism, security_features, and commercial_activity are best observed from street-view; industrial_presence is best inferred from satellite. "
         "If unsure about any field, still return a best guess instead of leaving it empty. Evidence should not be omitted, and should contain at least one short phrase for each available modality. "
         "Do not output evidence as a paragraph. "
         "Do not use prior knowledge about the location. Nightlight evidence must describe only light intensity and spatial distribution. Do not infer object types or sources. Avoid brand names, place names, or semantic labels. Use only generic visual descriptions."
     )
     schema_example = (
-        '{"predicted_quintile": 3, "confidence": 0.6, '
+        '{"predicted_quintile": 3, '
         '"evidence": {"streetview": ["brick houses", "narrow street", "few trees"], '
         '"satellite": ["dense buildings", "road grid", "small gardens"], '
         '"nightlight": ["dim lighting", "patchy glow", "dark edges"]}, '
         '"visual_indicators": {"density": 0.8, "greenery": 0.3, "lighting": 0.4, "infrastructure": 0.6, '
         '"building_condition": 0.5, "land_use_mix": 0.5, "cleanliness": 0.6, "accessibility": 0.5, '
-        '"vehicle_presence": 0.4, "housing_type": 0.6, "vacancy": 0.2}}'
+        '"vehicle_presence": 0.4, "housing_type": 0.6, "vacancy": 0.2, '
+        '"commercial_activity": 0.3, "industrial_presence": 0.1, "graffiti_vandalism": 0.4, "security_features": 0.5}}'
+    )
+    explain_schema_example = (
+        '{"evidence": {"streetview": ["brick houses", "narrow street", "few trees"], '
+        '"satellite": ["dense buildings", "road grid", "small gardens"], '
+        '"nightlight": ["dim lighting", "patchy glow", "dark edges"]}, '
+        '"visual_indicators": {"density": 0.8, "greenery": 0.3, "lighting": 0.4, "infrastructure": 0.6, '
+        '"building_condition": 0.5, "land_use_mix": 0.5, "cleanliness": 0.6, "accessibility": 0.5, '
+        '"vehicle_presence": 0.4, "housing_type": 0.6, "vacancy": 0.2, '
+        '"commercial_activity": 0.3, "industrial_presence": 0.1, "graffiti_vandalism": 0.4, "security_features": 0.5}}'
     )
     if task == "ordinal":
         return (
             f"Predict the deprivation quintile for this location using the {primary_phrase} together with {modality_phrase}. "
-            f"{core_rules} Return JSON with fields: predicted_quintile, confidence, evidence, visual_indicators. "
+            f"{core_rules} Return JSON with fields: predicted_quintile, evidence, visual_indicators. "
             f"Example JSON: {schema_example}"
         )
     if task == "explain":
         return (
             f"Describe the shared visual cues across the {primary_phrase} together with {modality_phrase}, "
-            "then predict whether the location is above or below the median deprivation level. "
-            f"{core_rules} Return JSON with fields: above_median_deprivation, predicted_rank_band, confidence, evidence, visual_indicators. "
-            f"Example JSON: {schema_example}"
+            "without predicting deprivation labels, rank bands, or confidence scores. "
+            f"{core_rules} Return JSON with fields: evidence, visual_indicators. "
+            f"Example JSON: {explain_schema_example}"
         )
     return (
-        f"Analyze the location using the {primary_phrase} together with {modality_phrase}. {core_rules} Return JSON with fields: predicted_quintile, confidence, evidence, visual_indicators. "
+        f"Analyze the location using the {primary_phrase} together with {modality_phrase}. {core_rules} Return JSON with fields: predicted_quintile, evidence, visual_indicators. "
         f"Example JSON: {schema_example}"
     )
 
 
 def build_answer(record: dict, task: str = "ordinal") -> str:
     quintile = record.get("deprivation_quintile")
-    rank = record.get("deprivation_rank")
     if task == "explain":
-        band = "unknown"
-        if isinstance(rank, (int, float)):
-            rank_int = int(rank)
-            low = max(1, (rank_int // 1000) * 1000)
-            high = min(5000, low + 999)
-            band = f"{low}-{high}"
-        payload = {
-            "above_median_deprivation": bool(quintile is not None and int(quintile) >= 3),
-            "predicted_rank_band": band,
-            "confidence": 1.0,
-        }
+        payload = {}
     else:
         payload = {
             "predicted_quintile": int(quintile) if quintile is not None else None,
-            "confidence": 1.0,
         }
     return json.dumps(payload, ensure_ascii=False)
 
@@ -147,7 +154,6 @@ def build_prompt(
 
 def to_abs_uri(path: str | Path) -> str:
     return Path(path).resolve().as_uri()
-
 
 
 
