@@ -187,7 +187,6 @@ smoke test 会检查：
 
 ```text
 prediction_json
-- predicted_quintile
 - visual_indicators
   - density
   - greenery
@@ -280,3 +279,7 @@ $
 
 ### Crime
 
+POI
+```
+.\.venv\Scripts\python.exe data_processing\osm_poi.py --output-dir outputs\osm_poi
+```

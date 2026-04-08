@@ -32,6 +32,16 @@ def load_jsonl(path: Path) -> list[dict]:
     return rows
 
 
+def get_predicted_quintile(pred: dict) -> float | None:
+    if not isinstance(pred, dict):
+        return None
+    for key in ("predicted_quintile", "predicted_rank_band"):
+        value = pred.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+    return None
+
+
 def main():
     args = parse_args()
     gold = {row["id"]: row for row in load_jsonl(args.gold_jsonl)}
@@ -43,11 +53,12 @@ def main():
         if gold_row is None:
             continue
         pred = row.get("prediction_json", {}) if isinstance(row.get("prediction_json", {}), dict) else {}
+        predicted_quintile = get_predicted_quintile(pred)
         rows.append(
             {
                 "id": row["id"],
                 "datazone": gold_row["datazone"],
-                "predicted_quintile": pred.get("predicted_quintile"),
+                "predicted_quintile": predicted_quintile,
                 "prediction_text": row.get("prediction_text"),
                 "lat": gold_row.get("lat"),
                 "lon": gold_row.get("lon"),

@@ -6,7 +6,6 @@ import base64
 import json
 import mimetypes
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -17,7 +16,7 @@ if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
 from glasgow_vlm.data import GlasgowVLMJsonlDataset
-from glasgow_vlm.prompts import SYSTEM_PROMPT
+from glasgow_vlm.prompts import SYSTEM_PROMPT, build_prompt
 
 
 DEFAULT_MODEL = "qwen3-vl-plus"
@@ -35,7 +34,7 @@ def parse_args():
     parser.add_argument("--task", choices=("ordinal", "explain"), default="ordinal")
     parser.add_argument("--model", type=str, default=DEFAULT_MODEL)
     parser.add_argument("--base-url", type=str, default=DEFAULT_BASE_URL)
-    parser.add_argument("--max-new-tokens", type=int, default=512)
+    parser.add_argument("--max-new-tokens", type=int, default=1024)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--api-key", type=str, default="")
     parser.add_argument("--max-samples", type=int, default=0, help="Only run the first N samples. 0 means all.")
@@ -68,9 +67,27 @@ def encode_image_data_url(path: str | Path) -> str:
     return f"data:{mime_type};base64,{encoded}"
 
 
+def _derive_modalities(record: dict, input_mode: str) -> tuple[tuple[str, ...], str]:
+    secondary_modality = record.get("secondary_modality", "satellite")
+    if input_mode == "triple":
+        modalities: tuple[str, ...] = ("satellite", "ntl")
+    elif input_mode == "satellite_ntl":
+        modalities = ("ntl",)
+    elif input_mode == "dual" and secondary_modality == "ntl":
+        modalities = ("ntl",)
+    elif input_mode in ("satellite", "streetview"):
+        modalities = ()
+    else:
+        modalities = ("satellite", secondary_modality)
+    primary_modality = "satellite" if input_mode == "satellite_ntl" else "streetview"
+    return tuple(dict.fromkeys(modalities)), primary_modality
+
+
 def build_messages(sample: dict, input_mode: str, task: str) -> list[dict]:
-    content: list[dict] = [{"type": "text", "text": sample["prompt"]}]
     record = sample["record"]
+    modalities, primary_modality = _derive_modalities(record, input_mode)
+    prompt_text = build_prompt(record, task, modalities=modalities, primary_modality=primary_modality)
+    content: list[dict] = [{"type": "text", "text": prompt_text}]
     if input_mode in ("streetview", "dual", "triple"):
         content.append(
             {
@@ -169,33 +186,21 @@ def extract_json(text: str) -> dict:
     return {}
 
 
-def _coerce_evidence(value):
+def _sanitize_json_value(value):
+    if isinstance(value, dict):
+        return {str(key): _sanitize_json_value(inner) for key, inner in value.items()}
     if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
+        return [_sanitize_json_value(item) for item in value]
     if isinstance(value, str):
         return value.strip()
-    return []
+    return value
 
 
-def normalize_prediction_json(payload: dict) -> dict:
+def normalize_prediction_json(payload: dict, task: str = "ordinal") -> dict:
     if not isinstance(payload, dict):
         return {}
 
-    normalized: dict[str, object] = {}
-    if "predicted_quintile" in payload:
-        normalized["predicted_quintile"] = payload["predicted_quintile"]
-    if isinstance(payload.get("visual_indicators"), dict):
-        normalized["visual_indicators"] = payload["visual_indicators"]
-
-    evidence = payload.get("evidence")
-    if isinstance(evidence, dict):
-        normalized["evidence"] = evidence
-    elif evidence is not None:
-        normalized["evidence"] = _coerce_evidence(evidence)
-    else:
-        normalized["evidence"] = []
-
-    return normalized
+    return _sanitize_json_value(payload)
 
 
 def call_model(base_url: str, api_key: str, model: str, messages: list[dict], max_new_tokens: int, temperature: float) -> str:
@@ -298,7 +303,6 @@ def main():
             sample = {
                 "id": sample_id,
                 "record": record,
-                "prompt": record.get("prompt", ""),
             }
             print(f"[{idx}/{len(samples)}] Calling model for {sample['id']}")
             messages = build_messages(sample, args.input_mode, args.task)
@@ -307,7 +311,7 @@ def main():
                 "id": sample["id"],
                 "datazone": sample["record"]["datazone"],
                 "prediction_text": text,
-                "prediction_json": normalize_prediction_json(extract_json(text)),
+                "prediction_json": normalize_prediction_json(extract_json(text), task=args.task),
                 "model": args.model,
             }
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
@@ -320,8 +324,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
 
 
 
