@@ -67,6 +67,18 @@
 
 这些脚本只生成对齐 CSV 和摘要文件，不再合并 SIMD 标签。
 
+## OpenStreetMap POI 提取
+
+可以直接根据 `glasgow_datazone/glasgow_datazone.shp` 提取 OSM POI 数据：
+
+```powershell
+.\.venv\Scripts\python.exe data_processing\osm_poi.py --output-dir outputs\osm_poi
+```
+
+默认会输出：
+- `outputs/osm_poi/osm_poi.csv`
+- `outputs/osm_poi/osm_poi_by_datazone.csv`
+
 ## 生成 JSONL
 
 `scripts/build_vlm_jsonl.py` 会把对齐 CSV 转成 VLM JSONL 文件。
@@ -267,5 +279,4 @@ $
 
 
 ### Crime
-
 
