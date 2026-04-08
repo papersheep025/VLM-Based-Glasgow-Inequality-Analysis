@@ -4,3 +4,4 @@ glasgow_datazone/
 .python-3.13.7/
 .wheelhouse/
 CLAUDE.md
+.venv
