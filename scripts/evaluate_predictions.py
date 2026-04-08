@@ -37,6 +37,18 @@ def extract_int(text: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def get_predicted_quintile(pred_json: dict) -> int | None:
+    if not isinstance(pred_json, dict):
+        return None
+    for key in ("predicted_quintile", "predicted_rank_band"):
+        value = pred_json.get(key)
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+    return None
+
+
 def main():
     args = parse_args()
     gold = {row["id"]: row for row in load_jsonl(args.gold_jsonl)}
@@ -56,7 +68,7 @@ def main():
             continue
         pred_text = row.get("prediction_text", "")
         pred_json = row.get("prediction_json", {})
-        pred_q = pred_json.get("predicted_quintile") if isinstance(pred_json, dict) else None
+        pred_q = get_predicted_quintile(pred_json)
         if pred_q is None:
             pred_q = extract_int(str(pred_text))
         if pred_q is None:
@@ -76,4 +88,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

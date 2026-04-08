@@ -87,8 +87,7 @@ def build_instruction(
         "Do not use prior knowledge about the location. Nightlight evidence must describe only light intensity and spatial distribution. Do not infer object types or sources. Avoid brand names, place names, or semantic labels. Use only generic visual descriptions."
     )
     schema_example = (
-        '{"predicted_quintile": 3, '
-        '"evidence": {"streetview": ["brick houses", "narrow street", "few trees"], '
+        '{"evidence": {"streetview": ["brick houses", "narrow street", "few trees"], '
         '"satellite": ["dense buildings", "road grid", "small gardens"], '
         '"nightlight": ["dim lighting", "patchy glow", "dark edges"]}, '
         '"visual_indicators": {"density": 0.8, "greenery": 0.3, "lighting": 0.4, "infrastructure": 0.6, '
@@ -107,8 +106,8 @@ def build_instruction(
     )
     if task == "ordinal":
         return (
-            f"Predict the deprivation quintile for this location using the {primary_phrase} together with {modality_phrase}. "
-            f"{core_rules} Return JSON with fields: predicted_quintile, evidence, visual_indicators. "
+            f"Analyze deprivation-related visual cues for this location using the {primary_phrase} together with {modality_phrase}. "
+            f"{core_rules} Return JSON with fields: evidence, visual_indicators. "
             f"Example JSON: {schema_example}"
         )
     if task == "explain":
@@ -119,7 +118,7 @@ def build_instruction(
             f"Example JSON: {explain_schema_example}"
         )
     return (
-        f"Analyze the location using the {primary_phrase} together with {modality_phrase}. {core_rules} Return JSON with fields: predicted_quintile, evidence, visual_indicators. "
+        f"Analyze the location using the {primary_phrase} together with {modality_phrase}. {core_rules} Return JSON with fields: evidence, visual_indicators. "
         f"Example JSON: {schema_example}"
     )
 
@@ -154,7 +153,5 @@ def build_prompt(
 
 def to_abs_uri(path: str | Path) -> str:
     return Path(path).resolve().as_uri()
-
-
 
 
