@@ -134,30 +134,6 @@
 - `triple`
 
 
-街景 + 遥感 explain 示例生成：
-
-```powershell
-.\.venv\Scripts\python.exe scripts\build_vlm_jsonl.py --alignment-csv dataset/streetview_satellite_aligned/streetview_prefix_satellite_alignment.csv --output-dir dataset/streetview_satellite_aligned/vlm_data --input-mode dual --task explain
-```
-
-街景 + 夜光 explain 示例生成：
-
-```powershell
-.\.venv\Scripts\python.exe scripts\build_vlm_jsonl.py --alignment-csv dataset/streetview_ntl_aligned/streetview_ntl_alignment.csv --output-dir dataset/streetview_ntl_aligned/vlm_data --input-mode dual --task explain
-```
-
-遥感 + 夜光 explain 示例生成：
-
-```powershell
-.\.venv\Scripts\python.exe scripts\build_vlm_jsonl.py --alignment-csv dataset/satellite_ntl_aligned/satellite_ntl_alignment.csv --output-dir dataset/satellite_ntl_aligned/vlm_data --input-mode satellite_ntl --task explain
-```
-
-街景 + 遥感 + 夜光三模态 explain 示例生成：
-
-```powershell
-.\.venv\Scripts\python.exe scripts\build_vlm_jsonl.py --alignment-csv dataset/streetview_satellite_ntl_aligned/streetview_satellite_ntl_alignment.csv --output-dir dataset/streetview_satellite_ntl_aligned/vlm_data --input-mode triple --task explain
-```
-
 ## Smoke Test
 
 对生成的 JSONL 做快速检查：
@@ -175,9 +151,11 @@ smoke test 会检查：
 ### 跑小批量进行测试
 街景 + 遥感 + 夜光三模态
 --max-samples可以改测试数量
+Win
 ```powershell
 .\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/streetview_satellite_ntl_aligned/vlm_data/triple_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_triple_preview.jsonl --input-mode triple --task explain --max-samples 5
 ```
+Mac
 ```powershell
 python scripts/predict_qwen3_vl_plus_api.py \
   --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
@@ -188,28 +166,8 @@ python scripts/predict_qwen3_vl_plus_api.py \
 
 ## 全量运行
 
-全量跑要去掉 `--max-samples`。
-
-### 街景 + 遥感
-
-```powershell
-.\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/streetview_satellite_aligned/vlm_data/dual_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_streetview_satellite.jsonl --input-mode dual --task explain
-```
-
-### 街景 + 夜光
-
-```powershell
-.\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/streetview_ntl_aligned/vlm_data/dual_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_streetview_ntl.jsonl --input-mode dual --task explain
-```
-
-### 遥感 + 夜光
-
-```powershell
-.\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/satellite_ntl_aligned/vlm_data/satellite_ntl_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_satellite_ntl.jsonl --input-mode satellite_ntl --task explain
-```
-
 ### 街景 + 遥感 + 夜光三模态
-
+Win
 ```powershell
 .\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/streetview_satellite_ntl_aligned/vlm_data/triple_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_triple.jsonl --input-mode triple --task explain
 ```
@@ -313,25 +271,14 @@ $Relative_i,k = (x_i,k - min_d(x_k)) / (max_d(x_k) - min_d(x_k) + epsilon)$
 
 ### Income
 
-
 ### Employment
-
 
 ### Environment
 
-
 ### Education
-
 
 ### Health
 
-
 ### Housing
 
-
 ### Crime
-
-POI
-```
-.\.venv\Scripts\python.exe data_processing\osm_poi.py --output-dir outputs\osm_poi
-```
