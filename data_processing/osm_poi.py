@@ -32,7 +32,7 @@ DEFAULT_TAG_KEYS = (
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Extract OpenStreetMap POIs inside Glasgow datazones.")
+    parser = argparse.ArgumentParser(description="Extract OpenStreetMap POI nodes inside Glasgow datazones.")
     parser.add_argument("--shapefile", type=Path, default=DEFAULT_SHAPEFILE, help="Path to the Glasgow datazone shapefile.")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR, help="Directory to write POI outputs.")
     parser.add_argument("--overpass-url", type=str, default=DEFAULT_OVERPASS_URL, help="Overpass API endpoint.")
@@ -88,7 +88,7 @@ def build_overpass_query(tag_key: str, bbox: tuple[float, float, float, float], 
     return f"""
 [out:json][timeout:{timeout}];
 (
-  nwr["{tag_key}"]({south},{west},{north},{east});
+  node["{tag_key}"]({south},{west},{north},{east});
 );
 out center tags;
 """.strip()

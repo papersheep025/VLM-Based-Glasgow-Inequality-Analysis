@@ -5,3 +5,4 @@ glasgow_datazone/
 .wheelhouse/
 CLAUDE.md
 .venv
+/dataset.zip
