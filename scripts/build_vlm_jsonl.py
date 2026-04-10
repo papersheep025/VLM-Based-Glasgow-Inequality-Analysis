@@ -102,6 +102,19 @@ def prompt_config_for_mode(input_mode: str, secondary_modality: str) -> tuple[st
 
 def read_alignment(alignment_csv: Path) -> pd.DataFrame:
     df = pd.read_csv(alignment_csv)
+    col_renames: dict[str, str] = {}
+    if "sv_path" in df.columns and "streetview_path" not in df.columns:
+        col_renames["sv_path"] = "streetview_path"
+    if "sv_lat" in df.columns and "lat" not in df.columns:
+        col_renames["sv_lat"] = "lat"
+    if "sv_lon" in df.columns and "lon" not in df.columns:
+        col_renames["sv_lon"] = "lon"
+    if "ntl_patch" in df.columns and "ntl_path" not in df.columns:
+        col_renames["ntl_patch"] = "ntl_path"
+    if "sv_image" in df.columns and "image" not in df.columns:
+        col_renames["sv_image"] = "image"
+    if col_renames:
+        df = df.rename(columns=col_renames)
     if "satellite_patch" not in df.columns and "satellite_path" in df.columns:
         df = df.rename(columns={"satellite_path": "satellite_patch"})
     if "streetview_path" not in df.columns:
