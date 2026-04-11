@@ -1,0 +1,5 @@
+{"id": "S01010065__S01010065_9210_0.jpg", "datazone": "S01010065", "prediction_json": {"income": 5, "employment": 6, "health": 7, "education": 5, "housing": 6, "access": 6, "crime": 6, "overall": 5.84}, "model": "qwen3-vl-plus"}
+{"id": "S01010065__S01010065_9210_1.jpg", "datazone": "S01010065", "prediction_json": {"income": 5, "employment": 6, "health": 7, "education": 5, "housing": 6, "access": 7, "crime": 6, "overall": 5.94}, "model": "qwen3-vl-plus"}
+{"id": "S01010065__S01010065_9232_1.jpg", "datazone": "S01010065", "prediction_json": {"income": 6, "employment": 7, "health": 8, "education": 5, "housing": 7, "access": 7, "crime": 7, "overall": 6.62}, "model": "qwen3-vl-plus"}
+{"id": "S01010065__S01010065_9225_0.jpg", "datazone": "S01010065", "prediction_json": {"income": 4, "employment": 5, "health": 6, "education": 5, "housing": 5, "access": 6, "crime": 5, "overall": 5.02}, "model": "qwen3-vl-plus"}
+{"id": "S01010065__S01010065_9225_1.jpg", "datazone": "S01010065", "prediction_json": {"income": 5, "employment": 6, "health": 7, "education": 5, "housing": 6, "access": 7, "crime": 6, "overall": 6.02}, "model": "qwen3-vl-plus"}
