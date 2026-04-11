@@ -134,42 +134,112 @@
 - `triple`
 
 
-## Smoke Test
+## Prompt 模块
 
-对生成的 JSONL 做快速检查：
+所有 prompt 模板放在 `src/glasgow_vlm/prompts/`，通过 `--prompt` 参数切换：
 
-```powershell
-.\.venv\Scripts\python.exe scripts\smoke_test_vlm_pipeline.py --jsonl dataset/streetview_satellite_ntl_aligned/vlm_data/triple_explain_train.jsonl --num-samples 5
-```
+| `--prompt` 值 | 文件 | 输出字段 | 建议 `--max-new-tokens` |
+| --- | --- | --- | --- |
+| `simple` | `prompts/simple.py` | 7个域评分 + overall（无 CoT） | 512 |
+| `structured` | `prompts/structured.py` | 7个域评分 + overall | 1024（默认） |
+| `structured_plus` | `prompts/structured_plus.py` | 7个域评分 + overall + 8个细分变量评分 | 1024 |
+| `structured_reasoning` | `prompts/structured_reasoning.py` | reasoning + 7个域评分 + overall | 2048 |
+| `default` | `prompts/default.py` | evidence + visual_indicators | 1024 |
 
-smoke test 会检查：
-- 必需字段是否存在
-- 图像路径是否可读
-- prompt 是否可解析
-- 在当前“纯空间对齐”流程中，`answer_json` 是可选项
+所有 prompt 的输出均包含：`income`, `employment`, `health`, `education`, `housing`, `access`, `crime`（1–10整数）和 `overall`（浮点，加权公式：`0.12×income + 0.12×employment + 0.02×health + 0.01×education + 0.06×housing + 0.06×access + 0.04×crime`）。
 
 ### 跑小批量进行测试
-街景 + 遥感 + 夜光三模态
---max-samples可以改测试数量
-Win
-```powershell
-.\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/streetview_satellite_ntl_aligned/vlm_data/triple_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_triple_preview.jsonl --input-mode triple --task explain --max-samples 5
-```
-Mac
-```powershell
-python scripts/predict_qwen3_vl_plus_api.py \
+
+`--max-samples` 控制测试数量，`--overwrite` 从头覆盖写。
+
+**simple（直接评分，无 CoT，token 最少）：**
+
+```bash
+python3 scripts/predict_qwen3_vl_plus_api.py \
   --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
-  --output-jsonl outputs/predictions/sat_ntl_svi_triple_preview.jsonl \
-  --input-mode triple --task explain --max-samples 5
+  --output-jsonl outputs/predictions/qwen3_simple_preview.jsonl \
+  --input-mode triple --task explain \
+  --prompt simple \
+  --max-new-tokens 512 \
+  --max-samples 5 --overwrite
 ```
 
+**structured（只输出评分，token 少，推荐用于全量）：**
+
+```bash
+python3 scripts/predict_qwen3_vl_plus_api.py \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --output-jsonl outputs/predictions/qwen3_structured_preview.jsonl \
+  --input-mode triple --task explain \
+  --prompt structured \
+  --max-samples 5 --overwrite
+```
+
+**structured_plus（含细分变量评分，无 reasoning 文本）：**
+
+```bash
+python3 scripts/predict_qwen3_vl_plus_api.py \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --output-jsonl outputs/predictions/qwen3_structured_plus_preview.jsonl \
+  --input-mode triple --task explain \
+  --prompt structured_plus \
+  --max-samples 5 --overwrite
+```
+
+**structured_reasoning（含推理过程，需要更多 token）：**
+
+```bash
+python3 scripts/predict_qwen3_vl_plus_api.py \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --output-jsonl outputs/predictions/qwen3_reasoning_preview.jsonl \
+  --input-mode triple --task explain \
+  --prompt structured_reasoning \
+  --max-new-tokens 2048 \
+  --max-samples 5 --overwrite
+```
 
 ## 全量运行
 
-### 街景 + 遥感 + 夜光三模态
-Win
-```powershell
-.\.venv\Scripts\python.exe scripts\predict_qwen3_vl_plus_api.py --input-jsonl dataset/streetview_satellite_ntl_aligned/vlm_data/triple_explain_test.jsonl --output-jsonl outputs/predictions/qwen3_vl_plus_triple.jsonl --input-mode triple --task explain
+### simple（token 消耗最少）
+
+```bash
+python3 scripts/predict_qwen3_vl_plus_api.py \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --output-jsonl outputs/predictions/qwen3_simple_full.jsonl \
+  --input-mode triple --task explain \
+  --prompt simple \
+  --max-new-tokens 512
+```
+
+### structured_plus
+
+```bash
+python3 scripts/predict_qwen3_vl_plus_api.py \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --output-jsonl outputs/predictions/qwen3_structured_plus_full.jsonl \
+  --input-mode triple --task explain \
+  --prompt structured_plus
+```
+
+### structured（推荐）
+
+```bash
+python3 scripts/predict_qwen3_vl_plus_api.py \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --output-jsonl outputs/predictions/qwen3_structured_full.jsonl \
+  --input-mode triple --task explain \
+  --prompt structured
+```
+
+### structured_reasoning
+
+```bash
+python3 scripts/predict_qwen3_vl_plus_api.py \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --output-jsonl outputs/predictions/qwen3_reasoning_full.jsonl \
+  --input-mode triple --task explain \
+  --prompt structured_reasoning \
+  --max-new-tokens 2048
 ```
 
 ### 断点续跑
@@ -177,19 +247,7 @@ Win
 `predict_qwen3_vl_plus_api.py` 支持断点续跑：
 
 - 已完成的 `id` 会自动跳过
-- 空或不完整的记录会重新尝试
 - 想从头开始可以在最后加 `--overwrite`
-
-
-## Prompt 设计要点
-
-`src/glasgow_vlm/prompts.py` 定义了 prompt 模板。
-
-当前 prompt 的目标：
-- 限定 `evidence` 的输出均为短语，大幅减少 token 使用
-- 要求结构化 evidence，分成 `streetview`、`satellite`、`nightlight` 分别记录
-- 要求模型从图像中推断 visual indicators
-- 避免 Datazone ID “剧透”，防止大模型读取 ID 后调取 SIMD 数据干扰正常分析
 
 ## 预测指标和衍生指标
 

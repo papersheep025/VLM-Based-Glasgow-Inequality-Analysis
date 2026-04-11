@@ -16,13 +16,6 @@ SYSTEM_PROMPT = (
 )
 
 
-def deprivation_level_from_quintile(quintile: int | None) -> str:
-    if quintile is None:
-        return "unknown"
-    if quintile <= 2:
-        return "high deprivation"
-    return "low deprivation"
-
 
 def modality_label(modality: str = "satellite") -> str:
     if modality == "ntl":

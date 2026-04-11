@@ -15,8 +15,24 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
+import importlib
+
 from glasgow_vlm.data import GlasgowVLMJsonlDataset
-from glasgow_vlm.prompts import SYSTEM_PROMPT, build_prompt
+
+PROMPT_MODULES = {
+    "default":               "glasgow_vlm.prompts.default",
+    "structured":            "glasgow_vlm.prompts.structured",
+    "structured_reasoning":  "glasgow_vlm.prompts.structured_reasoning",
+    "structured_plus":       "glasgow_vlm.prompts.structured_plus",
+    "simple":                "glasgow_vlm.prompts.simple",
+}
+
+
+def load_prompt_module(name: str):
+    module_path = PROMPT_MODULES.get(name)
+    if module_path is None:
+        raise ValueError(f"Unknown prompt module '{name}'. Available: {list(PROMPT_MODULES)}")
+    return importlib.import_module(module_path)
 
 
 DEFAULT_MODEL = "qwen3-vl-plus"
@@ -40,6 +56,7 @@ def parse_args():
     parser.add_argument("--max-samples", type=int, default=0, help="Only run the first N samples. 0 means all.")
     parser.add_argument("--resume", action="store_true", help="Resume from an existing output JSONL by skipping completed ids.")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite any existing output JSONL and start from scratch.")
+    parser.add_argument("--prompt", choices=list(PROMPT_MODULES), default="structured", help="Prompt module to use.")
     return parser.parse_args()
 
 
@@ -83,10 +100,10 @@ def _derive_modalities(record: dict, input_mode: str) -> tuple[tuple[str, ...], 
     return tuple(dict.fromkeys(modalities)), primary_modality
 
 
-def build_messages(sample: dict, input_mode: str, task: str) -> list[dict]:
+def build_messages(sample: dict, input_mode: str, task: str, prompt_module) -> list[dict]:
     record = sample["record"]
     modalities, primary_modality = _derive_modalities(record, input_mode)
-    prompt_text = build_prompt(record, task, modalities=modalities, primary_modality=primary_modality)
+    prompt_text = prompt_module.build_prompt(record, task, modalities=modalities, primary_modality=primary_modality)
     content: list[dict] = [{"type": "text", "text": prompt_text}]
     if input_mode in ("streetview", "dual", "triple"):
         content.append(
@@ -113,7 +130,7 @@ def build_messages(sample: dict, input_mode: str, task: str) -> list[dict]:
             }
         )
     return [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": prompt_module.SYSTEM_PROMPT},
         {"role": "user", "content": content},
     ]
 
@@ -203,7 +220,7 @@ def normalize_prediction_json(payload: dict, task: str = "ordinal") -> dict:
     return _sanitize_json_value(payload)
 
 
-def call_model(base_url: str, api_key: str, model: str, messages: list[dict], max_new_tokens: int, temperature: float) -> str:
+def call_model(base_url: str, api_key: str, model: str, messages: list[dict], max_new_tokens: int, temperature: float) -> tuple[str, dict]:
     url = f"{base_url.rstrip('/')}/chat/completions"
     payload = {
         "model": model,
@@ -220,7 +237,7 @@ def call_model(base_url: str, api_key: str, model: str, messages: list[dict], ma
     resp.raise_for_status()
     data = resp.json()
     try:
-        return data["choices"][0]["message"]["content"]
+        return data["choices"][0]["message"]["content"], data.get("usage", {})
     except Exception as exc:
         raise RuntimeError(f"Unexpected response format: {data}") from exc
 
@@ -278,6 +295,8 @@ def load_processed_ids(path: Path) -> set[str]:
 
 def main():
     args = parse_args()
+    prompt_module = load_prompt_module(args.prompt)
+    print(f"Prompt module: {args.prompt} ({PROMPT_MODULES[args.prompt]})")
     api_key = get_api_key(args)
     verify_api_connection(args.base_url, api_key, args.model)
     dataset = GlasgowVLMJsonlDataset(args.input_jsonl, input_mode=args.input_mode, task=args.task)
@@ -289,6 +308,8 @@ def main():
     mode = "a" if resume_enabled and args.output_jsonl.exists() else "w"
     skipped = 0
     written = 0
+    total_prompt_tokens = 0
+    total_completion_tokens = 0
 
     with open(args.output_jsonl, mode, encoding="utf-8") as f:
         print(f"Loaded {len(samples)} sample(s) from {args.input_jsonl}")
@@ -305,12 +326,17 @@ def main():
                 "record": record,
             }
             print(f"[{idx}/{len(samples)}] Calling model for {sample['id']}")
-            messages = build_messages(sample, args.input_mode, args.task)
-            text = call_model(args.base_url, api_key, args.model, messages, args.max_new_tokens, args.temperature)
+            messages = build_messages(sample, args.input_mode, args.task, prompt_module)
+            text, usage = call_model(args.base_url, api_key, args.model, messages, args.max_new_tokens, args.temperature)
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+            total_prompt_tokens += prompt_tokens
+            total_completion_tokens += completion_tokens
+            print(f"  tokens this call: prompt={prompt_tokens}, completion={completion_tokens}, total={prompt_tokens + completion_tokens}")
+            print(f"  tokens cumulative: prompt={total_prompt_tokens}, completion={total_completion_tokens}, total={total_prompt_tokens + total_completion_tokens}")
             row = {
                 "id": sample["id"],
                 "datazone": sample["record"]["datazone"],
-                "prediction_text": text,
                 "prediction_json": normalize_prediction_json(extract_json(text), task=args.task),
                 "model": args.model,
             }
@@ -320,6 +346,7 @@ def main():
 
     print(f"Saved predictions to {args.output_jsonl}")
     print(f"Written {written} new sample(s); skipped {skipped} existing sample(s).")
+    print(f"Total tokens consumed: prompt={total_prompt_tokens}, completion={total_completion_tokens}, total={total_prompt_tokens + total_completion_tokens}")
 
 
 if __name__ == "__main__":
