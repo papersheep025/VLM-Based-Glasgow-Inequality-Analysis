@@ -148,6 +148,78 @@
 
 所有 prompt 的输出均包含：`income`, `employment`, `health`, `education`, `housing`, `access`, `crime`（1–10整数）和 `overall`（浮点，加权公式：`0.12×income + 0.12×employment + 0.02×health + 0.01×education + 0.06×housing + 0.06×access + 0.04×crime`）。
 
+### Few-Shot 链路
+
+除了上述 zero-shot prompt 模块，项目还提供了基于 `structured_plus` 的 few-shot 推理链路。
+
+**原理：** 在 API 请求中构建多轮对话，将 `dataset/few_shot_examples/few_shot_examples.json` 中的示例（每个 quintile 各一个，共 5 个）作为 user+assistant 轮次插入到 system prompt 和实际查询之间，让模型参考真实标注样本进行打分。
+
+**消息结构：**
+
+```text
+system  →  user(示例1图片+prompt) → assistant(示例1标注)
+        →  user(示例2图片+prompt) → assistant(示例2标注)
+        →  ...
+        →  user(待预测图片+prompt)
+```
+
+**相关文件：**
+
+- `src/glasgow_vlm/prompts/structured_plus_fewshot.py` — few-shot prompt 模块，复用 `structured_plus` 的 prompt 模板，新增示例加载、中间变量推导和示例回复构建
+- `scripts/predict_fewshot_api.py` — few-shot 预测脚本，从原始 `predict_qwen3_vl_plus_api.py` 导入工具函数
+- `dataset/few_shot_examples/few_shot_examples.json` — 5 个代表性样本（quintile 1–5），包含图片路径和 ground_truth_scores
+
+**专属参数：**
+
+- `--few-shot-json` — few-shot 数据路径（默认 `dataset/few_shot_examples/few_shot_examples.json`）
+- `--few-shot-count` — 使用的示例数量（默认全部 5 个）
+- `--few-shot-quintiles` — 指定使用哪些 quintile（如 `1 3 5`）
+
+**注意：** triple 模式下每个 few-shot 示例会额外附带 3 张图片。5 个示例 = 15 张额外图片 + 查询 3 张 = 18 张，token 开销较大。如遇 API 限制可减少 `--few-shot-count`。
+
+### Qwen3-VL-8B LoRA 微调
+
+这条链路用于把 `structured_plus` 的评分能力从 API 推理迁移到本地 LoRA 微调。
+
+**核心思路：**
+
+- 微调原因：API 链路是 zero-shot / few-shot 推理，模型没有直接学习过 SIMD 标注对，LoRA 让模型在真实图片-标注样本上学习“看图打分”。
+- 采用 LoRA：只训练低秩适配器，显存和参数量都比全量微调更可控，适合本地 32GB 机器。
+- 冻结视觉编码器：保留已预训练的图像特征提取能力，只更新语言侧的理解、推理和输出层。
+
+**数据流：**
+
+```text
+SIMD_data.csv
+  ↓ 按 datazone 合并标签
+train / val JSONL
+  ↓ 转换为训练格式
+mlx-vlm LoRA 数据
+```
+
+每条样本包含 `images`（3 张图片路径）和 `messages`（system + user + assistant 对话）。
+assistant 目标包含 16 个 key：7 个 domain score、1 个 overall、8 个由 `derive_intermediate_scores` 推导的中间变量。
+
+**相关文件：**
+
+- `scripts/build_lora_training_data.py` - 合并 SIMD 标签并生成 `mlx-vlm` 训练数据
+- `scripts/train_qwen3_vl_lora.py` - LoRA 训练启动脚本
+- `scripts/predict_local_qwen3_vl.py` - 本地 base + adapter 推理脚本
+
+**当前进度：**
+
+- 已完成 `build_lora_training_data.py`
+- 训练集：20,081 条样本，474 个 datazone
+- 验证集：2,662 条样本，59 个 datazone
+- 数据目录：`dataset/lora_training_data/`
+- `messages` 目前以 JSON 字符串存储，便于规避 PyArrow 嵌套类型问题；训练加载时可能需要 `json.loads` 或自定义 wrapper
+
+**后续步骤：**
+
+1. 先用小子集验证 `mlx-vlm` 的训练接口是否能正常跑通
+2. 再补充 LoRA 训练脚本和本地推理脚本
+3. 最后在同一 test set 上和 API baseline / few-shot 结果做统一评估
+
 ### 跑小批量进行测试
 
 `--max-samples` 控制测试数量，`--overwrite` 从头覆盖写。
@@ -198,6 +270,17 @@ python3 scripts/predict_qwen3_vl_plus_api.py \
   --max-samples 5 --overwrite
 ```
 
+**few-shot（基于 structured_plus，附带真实标注示例）：**
+
+```bash
+python3 scripts/predict_fewshot_api.py \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --output-jsonl outputs/predictions/qwen3_fewshot_preview.jsonl \
+  --input-mode triple --task explain \
+  --few-shot-count 3 \
+  --max-samples 5 --overwrite
+```
+
 ## 全量运行
 
 ### simple（token 消耗最少）
@@ -240,6 +323,25 @@ python3 scripts/predict_qwen3_vl_plus_api.py \
   --input-mode triple --task explain \
   --prompt structured_reasoning \
   --max-new-tokens 2048
+```
+
+### few-shot（全部 5 个示例）
+
+```bash
+python3 scripts/predict_fewshot_api.py \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --output-jsonl outputs/predictions/qwen3_fewshot_full.jsonl \
+  --input-mode triple --task explain
+```
+
+仅使用 quintile 1 和 5 作为对比示例：
+
+```bash
+python3 scripts/predict_fewshot_api.py \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --output-jsonl outputs/predictions/qwen3_fewshot_q15_full.jsonl \
+  --input-mode triple --task explain \
+  --few-shot-quintiles 1 5
 ```
 
 ### 断点续跑
