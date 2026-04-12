@@ -5,8 +5,7 @@
 主流程：
 - 构建空间对齐表
 - 生成 VLM JSONL 文件
-- 用 Qwen3-VL-Plus 的 API 预测
-- 评估预测结果
+- 调用 Qwen3-VL-Plus 的 API 或者部署本地 Qwen3-VL-8b 预测 SIMD Domain 分数
 - 按 datazone 进行聚合分析
 
 ## 实验总览
@@ -276,7 +275,7 @@ python3 scripts/inference/predict_fewshot_poi_api.py \
 
 使用 LM Studio 下载的 Qwen3-VL-8B-Instruct-MLX-4bit 进行 QLoRA 微调，在 Apple Silicon 上本地训练。
 
-### Qwen3-VL-8B LoRA 微调
+## Qwen3-VL-8B LoRA 微调
 
 这条链路用于把 `structured_plus` 的评分能力从 API 推理迁移到本地 LoRA 微调。
 
