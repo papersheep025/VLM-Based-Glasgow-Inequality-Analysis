@@ -4,6 +4,9 @@ pandas==2.3.3
 pillow==12.1.1
 requests==2.32.5
 tqdm==4.67.3
+torch
+datasets
+safetensors
 
 # Evaluation / analysis
 scikit-learn==1.8.0
@@ -16,3 +19,7 @@ pyproj==3.7.2
 rasterio==1.5.0
 earthengine-api==1.7.17
 geemap==0.37.1
+
+# Local LoRA fine-tuning on Apple Silicon
+mlx; platform_system == "Darwin" and platform_machine == "arm64"
+mlx-vlm; platform_system == "Darwin" and platform_machine == "arm64"

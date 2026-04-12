@@ -8,7 +8,7 @@
 输出：dataset/sat_ntl_svi_aligned/alignment.csv
 
 Usage:
-    python scripts/build_sat_ntl_svi_alignment.py
+    python scripts/data_prep/build_sat_ntl_svi_alignment.py
 """
 
 import pandas as pd
