@@ -93,17 +93,6 @@
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-## 生成 JSONL
-
-`scripts/data_prep/build_vlm_jsonl.py` 会把对齐 CSV 转成 VLM JSONL 文件。
-
-支持的 `--input-mode`：
-- `streetview`
-- `satellite`
-- `satellite_ntl`
-- `triple`
-
-
 ## Prompt 模块
 
 所有 prompt 模板放在 `src/glasgow_vlm/prompts/`，通过 `--prompt` 参数切换：
@@ -118,11 +107,7 @@
 
 所有 prompt 的输出均包含：`income`, `employment`, `health`, `education`, `housing`, `access`, `crime`（1–10整数）和 `overall`（浮点，加权公式：`0.12×income + 0.12×employment + 0.02×health + 0.01×education + 0.06×housing + 0.06×access + 0.04×crime`）。
 
-
-
-
-
-# API预测
+# 调用API预测
 
 ## Zero-shot
 
@@ -271,7 +256,7 @@ python3 scripts/inference/predict_fewshot_poi_api.py \
 - 想从头开始可以在最后加 `--overwrite`
 
 
-# 本地模型 LoRA 微调（Qwen3-VL-8B）
+# 部署本地模型 LoRA 微调（Qwen3-VL-8B）
 
 使用 LM Studio 下载的 Qwen3-VL-8B-Instruct-MLX-4bit 进行 QLoRA 微调，在 Apple Silicon 上本地训练。
 
