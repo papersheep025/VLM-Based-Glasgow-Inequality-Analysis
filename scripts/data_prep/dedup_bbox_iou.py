@@ -11,7 +11,7 @@ Outputs:
   - dataset/satellite_dataset/satellite_ntl_iou{thresh}/  (copies of kept NTL patches)
 
 Usage:
-    python scripts/dedup_bbox_iou.py --iou-threshold 0.5 [--dry-run]
+    python scripts/data_prep/dedup_bbox_iou.py --iou-threshold 0.5 [--dry-run]
 """
 
 import argparse

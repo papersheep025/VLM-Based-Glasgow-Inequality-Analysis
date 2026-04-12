@@ -1,43 +1,41 @@
 # -*- coding: utf-8 -*-
-"""Build HuggingFace Dataset for mlx-vlm LoRA fine-tuning.
+"""Build HuggingFace Dataset for mlx-vlm LoRA fine-tuning WITH POI context.
 
-Reads the existing train/val JSONL files, merges SIMD ground-truth scores
-by datazone, and outputs a HuggingFace Dataset (saved to disk) in the
-Qwen3-VL message format expected by mlx-vlm.
+Based on build_lora_training_data.py, but injects per-datazone POI context
+into the user prompt (via structured_fewshot_poi.format_poi_context).
 
 Usage:
-    python scripts/build_lora_training_data.py
-    python scripts/build_lora_training_data.py --max-samples 100
-    python scripts/build_lora_training_data.py --output-dir dataset/lora_training_data
+    python scripts/training/build_lora_training_data_poi.py
+    python scripts/training/build_lora_training_data_poi.py --max-samples 100
+    python scripts/training/build_lora_training_data_poi.py --poi-csv dataset/osm_poi/datazone_poi.csv
 """
 from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
 from pathlib import Path
 
 import pandas as pd
-from PIL import Image
-from datasets import Dataset, DatasetDict, Features, Value, Sequence
+from datasets import Dataset, DatasetDict
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
 from glasgow_vlm.prompts.structured_plus_fewshot import derive_intermediate_scores
-from glasgow_vlm.prompts.structured_plus import SYSTEM_PROMPT, build_prompt
+from glasgow_vlm.prompts.structured_fewshot_poi import (
+    SYSTEM_PROMPT,
+    build_prompt,
+    load_poi_lookup,
+    format_poi_context,
+    DEFAULT_POI_CSV,
+)
 
 DEFAULT_TRAIN_JSONL = ROOT / "dataset" / "sat_ntl_svi_aligned" / "vlm_data" / "triple_explain_train.jsonl"
 DEFAULT_VAL_JSONL = ROOT / "dataset" / "sat_ntl_svi_aligned" / "vlm_data" / "triple_explain_val.jsonl"
 DEFAULT_SIMD_CSV = ROOT / "dataset" / "SIMD" / "SIMD_data.csv"
-DEFAULT_OUTPUT_DIR = ROOT / "dataset" / "lora_training_data"
-
-DOMAIN_SCORE_COLS = [
-    "income_score", "employment_score", "health_score",
-    "education_score", "access_score", "crime_score", "housing_score",
-]
+DEFAULT_OUTPUT_DIR = ROOT / "dataset" / "lora_training_data_poi"
 
 
 def parse_args():
@@ -45,10 +43,9 @@ def parse_args():
     p.add_argument("--train-jsonl", type=Path, default=DEFAULT_TRAIN_JSONL)
     p.add_argument("--val-jsonl", type=Path, default=DEFAULT_VAL_JSONL)
     p.add_argument("--simd-csv", type=Path, default=DEFAULT_SIMD_CSV)
+    p.add_argument("--poi-csv", type=Path, default=DEFAULT_POI_CSV)
     p.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     p.add_argument("--max-samples", type=int, default=0, help="Limit samples per split (0=all).")
-    p.add_argument("--image-resize-shape", type=int, nargs=2, default=None,
-                   help="Resize images to this shape (w h) before saving.")
     return p.parse_args()
 
 
@@ -99,6 +96,7 @@ def build_target_response(scores: dict) -> str:
 def build_dataset_records(
     records: list[dict],
     simd: dict[str, dict],
+    poi_lookup: dict,
     max_samples: int = 0,
 ) -> list[dict]:
     samples = []
@@ -123,10 +121,12 @@ def build_dataset_records(
                 break
         else:
             modalities = ("satellite", "ntl")
+            poi_ctx = format_poi_context(poi_lookup.get(dz))
             prompt_text = build_prompt(
                 rec, "structured_plus",
                 modalities=modalities,
                 primary_modality="streetview",
+                poi_context=poi_ctx,
             )
 
             messages = [
@@ -170,6 +170,10 @@ def main():
     simd = load_simd_scores(args.simd_csv)
     print(f"  {len(simd)} datazones loaded")
 
+    print(f"Loading POI lookup from {args.poi_csv}...")
+    poi_lookup = load_poi_lookup(args.poi_csv)
+    print(f"  {len(poi_lookup)} datazones with POI data")
+
     print(f"Loading train JSONL: {args.train_jsonl}")
     train_records = load_jsonl(args.train_jsonl)
     print(f"  {len(train_records)} records")
@@ -179,12 +183,16 @@ def main():
     print(f"  {len(val_records)} records")
 
     print("Building train samples...")
-    train_samples = build_dataset_records(train_records, simd, args.max_samples)
+    train_samples = build_dataset_records(train_records, simd, poi_lookup, args.max_samples)
     print(f"  {len(train_samples)} train samples")
 
     print("Building val samples...")
-    val_samples = build_dataset_records(val_records, simd, args.max_samples)
+    val_samples = build_dataset_records(val_records, simd, poi_lookup, args.max_samples)
     print(f"  {len(val_samples)} val samples")
+
+    poi_hit = sum(1 for s in train_samples + val_samples if poi_lookup.get(s["datazone"]))
+    total = len(train_samples) + len(val_samples)
+    print(f"  POI coverage: {poi_hit}/{total} samples ({poi_hit/total*100:.1f}%)" if total else "")
 
     def to_hf_dataset(samples: list[dict]) -> Dataset:
         return Dataset.from_dict({
@@ -210,7 +218,14 @@ def main():
     print(f"  id: {sample['id']}")
     print(f"  datazone: {sample['datazone']}")
     print(f"  images: {[Path(p).name for p in sample['images']]}")
-    print(f"  assistant response: {sample['messages'][-1]['content'][0]['text'][:200]}")
+    msgs = sample["messages"]
+    user_text = ""
+    for part in msgs[1]["content"]:
+        if isinstance(part, dict) and part.get("type") == "text":
+            user_text = part["text"]
+    has_poi = "POI context" in user_text
+    print(f"  has POI context: {has_poi}")
+    print(f"  assistant response: {msgs[-1]['content'][0]['text'][:200]}")
 
 
 if __name__ == "__main__":

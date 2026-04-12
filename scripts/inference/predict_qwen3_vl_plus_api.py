@@ -17,6 +17,7 @@ if str(ROOT / "src") not in sys.path:
 
 import importlib
 
+from glasgow_vlm.config import DEFAULT_BASE_URL, DEFAULT_MODEL, DASHSCOPE_API_KEY
 from glasgow_vlm.data import GlasgowVLMJsonlDataset
 
 PROMPT_MODULES = {
@@ -35,11 +36,6 @@ def load_prompt_module(name: str):
     return importlib.import_module(module_path)
 
 
-DEFAULT_MODEL = "qwen3-vl-plus"
-DEFAULT_BASE_URL = os.getenv("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
-
-# Paste your DashScope API key here.
-DASHSCOPE_API_KEY = "sk-540a1528d0c24d50b7ababd5b3e42871"
 
 
 def parse_args():
