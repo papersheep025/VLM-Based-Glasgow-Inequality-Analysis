@@ -6,4 +6,7 @@ glasgow_datazone/
 CLAUDE.md
 .venv
 .venv311
-/dataset.zip
+outputs/
+.DS_Store
+**/__pycache__/
+*.pyc
