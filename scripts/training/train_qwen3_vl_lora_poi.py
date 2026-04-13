@@ -32,20 +32,21 @@ import warnings
 from pathlib import Path
 
 import mlx.core as mx
+import mlx.nn as nn
 import mlx.optimizers as optim
 from datasets import load_from_disk
 from PIL import Image
 from tqdm import tqdm
 
-from mlx_vlm.trainer import Trainer, save_adapter
-from mlx_vlm.trainer.trainer import get_prompt, grad_checkpoint
-from mlx_vlm.trainer.utils import find_all_linear_names, get_peft_model
+from mlx_vlm.trainer.datasets import get_prompt
+from mlx_vlm.trainer.sft_trainer import save_adapter
+from mlx_vlm.trainer.utils import find_all_linear_names, get_peft_model, grad_checkpoint
 from mlx_vlm.utils import load, load_image_processor, prepare_inputs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 DEFAULT_MODEL_PATH = str(
     Path.home() / ".lmstudio" / "models" / "lmstudio-community" / "Qwen3-VL-8B-Instruct-MLX-4bit"
@@ -127,10 +128,10 @@ class GlasgowVisionDataset:
 
         inputs = prepare_inputs(
             self.processor,
-            images,
-            [prompt],
-            image_token_index,
-            self.image_resize_shape,
+            images=images,
+            prompts=[prompt],
+            image_token_index=image_token_index,
+            resize_shape=self.image_resize_shape,
         )
 
         input_ids = inputs["input_ids"]
@@ -197,20 +198,38 @@ def main():
         dropout=args.lora_dropout,
     )
 
-    trainable = sum(p.size for _, p in model.trainable_parameters().items()) if hasattr(model.trainable_parameters(), 'items') else sum(p.size for _, p in model.trainable_parameters())
-    total = sum(p.size for _, p in mx.utils.tree_flatten(model.parameters()))
+    from mlx.utils import tree_flatten
+    trainable = sum(p.size for _, p in tree_flatten(model.trainable_parameters()))
+    total = sum(p.size for _, p in tree_flatten(model.parameters()))
     logger.info(f"Trainable parameters: {trainable:,} / {total:,} ({trainable/total*100:.2f}%)")
 
     logger.info("Setting up optimizer")
     optimizer = optim.Adam(learning_rate=args.learning_rate)
 
-    logger.info("Setting up trainer")
-    trainer = Trainer(model, optimizer)
-
     output_dir = Path(args.output_path).parent
     output_dir.mkdir(parents=True, exist_ok=True)
 
     model.train()
+
+    def loss_fn(model, batch):
+        pixel_values = batch["pixel_values"]
+        input_ids = batch["input_ids"]
+        attention_mask = batch["attention_mask"]
+        lengths = mx.sum(attention_mask, axis=1)
+        labels = input_ids[:, 1:]
+        input_ids = input_ids[:, :-1]
+        kwargs = {k: v for k, v in batch.items() if k not in ["input_ids", "pixel_values", "attention_mask"]}
+        outputs = model(input_ids, pixel_values, attention_mask, **kwargs)
+        logits = outputs.logits.astype(mx.float32)
+        if logits.shape[1] > labels.shape[1]:
+            logits = logits[:, -labels.shape[1]:, :]
+        elif logits.shape[1] < labels.shape[1]:
+            labels = labels[:, :logits.shape[1]]
+        length_mask = mx.arange(input_ids.shape[1])[None, :] < lengths[:, None]
+        ce = nn.losses.cross_entropy(logits, labels) * length_mask
+        return ce.sum() / length_mask.sum()
+
+    loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
 
     logger.info("Starting training (image + POI)")
     for epoch in range(args.epochs):
@@ -219,7 +238,8 @@ def main():
         progress_bar = tqdm(range(steps), desc=f"Epoch {epoch+1}/{args.epochs}", position=0, leave=True)
         for i in progress_bar:
             batch = dataset[i * args.batch_size : (i + 1) * args.batch_size]
-            loss = trainer.train_step(batch)
+            loss, grads = loss_and_grad_fn(model, batch)
+            optimizer.update(model, grads)
             mx.eval(model.parameters(), optimizer.state)
 
             progress_bar.set_postfix({

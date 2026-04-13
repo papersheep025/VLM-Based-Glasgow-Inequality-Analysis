@@ -1,0 +1,19 @@
+# CUDA training requirements (Linux + NVIDIA GPU)
+# Install: pip install -r requirements_cuda.txt
+
+# Core
+torch>=2.3.0
+torchvision
+
+# HuggingFace
+transformers>=4.50.0
+datasets>=2.18.0
+accelerate>=0.30.0
+peft>=0.11.0
+bitsandbytes>=0.43.0
+
+# Vision / data
+pillow>=10.0.0
+safetensors>=0.4.0
+pandas>=2.0.0
+tqdm>=4.66.0
