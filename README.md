@@ -476,3 +476,203 @@ python3 scripts/training/train_qwen3_vl_lora_poi.py \
 - `src/glasgow_vlm/prompts/structured_fewshot_poi.py` — POI prompt 模块（`load_poi_lookup`、`format_poi_context`）
 - `dataset/osm_poi/datazone_poi.csv` — POI 原始数据
 - `dataset/lora_training_data_poi/` — 生成的训练数据集
+
+---
+
+## 远程服务器 LoRA 微调 + 预测（CUDA）
+
+本地 MLX 链路用于 Apple Silicon 开发验证，正式训练和预测在配有 GPU 的远程服务器上完成，使用 PyTorch + HuggingFace PEFT（QLoRA 4-bit）。
+
+与本地 MLX 链路的核心区别：
+
+| | 本地 MLX 链路 | 远程 CUDA 链路 |
+| --- | --- | --- |
+| 训练脚本 | `train_qwen3_vl_lora.py` | `train_qwen3_vl_lora_cuda.py` |
+| POI 训练脚本 | `train_qwen3_vl_lora_poi.py` | `train_qwen3_vl_lora_poi_cuda.py` |
+| adapter 格式 | mlx-vlm safetensors | PEFT（`adapter_config.json` + `adapter_model.safetensors`） |
+| adapter 输出 | `outputs/lora_adapters/` | `outputs/lora_adapters_cuda/final_adapter/` |
+| POI adapter 输出 | `outputs/lora_adapters_poi/` | `outputs/lora_adapters_poi_cuda/final_adapter/` |
+| 推理脚本 | `predict_local_qwen3_vl.py` | `predict_lora_local.py` |
+
+训练数据构建脚本（`build_lora_training_data.py` / `build_lora_training_data_poi.py`）两条链路共用，无需重复构建。
+
+## Step 1 — 将项目文件同步到远程服务器
+
+```bash
+# 同步代码和数据（首次）
+rsync -avz --exclude='.git' --exclude='outputs/' \
+  /path/to/VLM-Based-Glasgow-Inequality-Analysis/ \
+  user@server:/home/user/glasgow/
+
+# 后续增量同步
+rsync -avz dataset/ user@server:/home/user/glasgow/dataset/
+```
+
+如果服务器和本机图片路径不同，训练时加 `--path-prefix-remap` 参数重映射。
+
+## Step 2 — 远程服务器环境
+
+```bash
+pip install torch torchvision transformers peft bitsandbytes accelerate datasets tqdm pillow
+```
+
+## Step 3 — LoRA 微调（纯图像）
+
+**smoke test（先跑通）：**
+
+```bash
+python scripts/training/train_qwen3_vl_lora_cuda.py \
+  --max-samples 20 --epochs 1 --print-every 5
+```
+
+**正式训练（单卡）：**
+
+```bash
+python scripts/training/train_qwen3_vl_lora_cuda.py \
+  --epochs 2 \
+  --batch-size 1 \
+  --grad-accum-steps 4 \
+  --learning-rate 2e-5 \
+  --lora-rank 16 \
+  --lora-alpha 32 \
+  --save-every 500
+```
+
+**多卡训练（推荐）：**
+
+```bash
+accelerate launch --num_processes 2 \
+  scripts/training/train_qwen3_vl_lora_cuda.py
+```
+
+**从 checkpoint 恢复：**
+
+```bash
+python scripts/training/train_qwen3_vl_lora_cuda.py \
+  --resume-from outputs/lora_adapters_cuda/checkpoint_ep1_step500
+```
+
+**路径重映射（Mac → 服务器）：**
+
+```bash
+python scripts/training/train_qwen3_vl_lora_cuda.py \
+  --path-prefix-remap /Users/papersheep/projects/VLM-Based-Glasgow-Inequality-Analysis:/home/user/glasgow
+```
+
+输出：adapter 保存到 `outputs/lora_adapters_cuda/final_adapter/`。
+
+## Step 4 — LoRA 微调（图像 + POI）
+
+与纯图像链路命令相同，仅换脚本名，默认输出到 `outputs/lora_adapters_poi_cuda/final_adapter/`：
+
+```bash
+# smoke test
+python scripts/training/train_qwen3_vl_lora_poi_cuda.py \
+  --max-samples 20 --epochs 1 --print-every 5
+
+# 正式训练
+python scripts/training/train_qwen3_vl_lora_poi_cuda.py \
+  --epochs 2 --batch-size 1 --grad-accum-steps 4 \
+  --learning-rate 2e-5 --lora-rank 16 --lora-alpha 32
+
+# 多卡
+accelerate launch --num_processes 2 \
+  scripts/training/train_qwen3_vl_lora_poi_cuda.py
+```
+
+训练参数说明（两个脚本通用）：
+
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `--model-id` | `Qwen/Qwen3-VL-8B-Instruct` | base 模型 HuggingFace ID 或本地路径 |
+| `--epochs` | 2 | 训练轮数 |
+| `--batch-size` | 1 | 批量大小 |
+| `--grad-accum-steps` | 4 | 梯度累积步数（有效 batch = batch × accum） |
+| `--learning-rate` | 2e-5 | 学习率 |
+| `--max-length` | 2048 / 4096 | 最大 token 长度 |
+| `--lora-rank` | 16 | LoRA 秩 |
+| `--lora-alpha` | 32 | LoRA alpha |
+| `--save-every` | 500 | 每 N 个 optimizer step 保存 checkpoint |
+| `--no-quantization` | false | 跳过 4-bit 量化，用 BF16 加载（需更多显存） |
+| `--grad-checkpoint` | false | 梯度检查点（省显存，速度变慢） |
+| `--max-samples` | 0（全部） | 限制训练样本数（smoke test 用） |
+| `--path-prefix-remap` | 无 | 图片路径重映射：`OLD:NEW` |
+| `--resume-from` | 无 | 从指定 checkpoint 目录恢复训练 |
+
+## Step 5 — 预测
+
+训练完成后，`final_adapter/` 目录包含：
+
+```text
+final_adapter/
+├── adapter_config.json        # LoRA 配置（rank、target_modules 等）
+├── adapter_model.safetensors  # LoRA 权重
+├── tokenizer.json
+├── tokenizer_config.json
+└── preprocessor_config.json
+```
+
+使用 `predict_lora_local.py` 将 LoRA adapter 叠加在 base model 上进行推理：
+
+**smoke test（5 条）：**
+
+```bash
+# 纯图像 adapter
+python scripts/inference/predict_lora_local.py \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --output-jsonl outputs/predictions/lora_triple_preview.jsonl \
+  --adapter-path outputs/lora_adapters_cuda/final_adapter \
+  --input-mode triple --task explain --max-samples 5
+
+# 图像 + POI adapter
+python scripts/inference/predict_lora_local.py \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --output-jsonl outputs/predictions/lora_poi_triple_preview.jsonl \
+  --adapter-path outputs/lora_adapters_poi_cuda/final_adapter \
+  --input-mode triple --task explain --max-samples 5
+```
+
+**全量预测：**
+
+```bash
+# 纯图像
+python scripts/inference/predict_lora_local.py \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --output-jsonl outputs/predictions/lora_triple.jsonl \
+  --adapter-path outputs/lora_adapters_cuda/final_adapter \
+  --input-mode triple --task explain
+
+# 图像 + POI
+python scripts/inference/predict_lora_local.py \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --output-jsonl outputs/predictions/lora_poi_triple.jsonl \
+  --adapter-path outputs/lora_adapters_poi_cuda/final_adapter \
+  --input-mode triple --task explain
+```
+
+推理参数说明：
+
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `--adapter-path` | 必填 | LoRA adapter 目录（`final_adapter/` 或 checkpoint） |
+| `--base-model-id` | `Qwen/Qwen3-VL-8B-Instruct` | base 模型 ID 或本地路径 |
+| `--input-mode` | `triple` | 图像模态组合 |
+| `--task` | `explain` | 预测任务类型 |
+| `--prompt` | `structured` | prompt 模块（需与训练数据的 prompt 一致） |
+| `--max-new-tokens` | 1024 | 最大生成 token 数 |
+| `--max-samples` | 0（全部） | 限制预测样本数 |
+| `--overwrite` | false | 覆盖已有输出文件 |
+| `--no-quantization` | false | BF16 加载（不量化） |
+| `--merge-adapter` | false | 推理前将 LoRA 权重合并进 base model（更快，更耗显存） |
+
+断点续跑：脚本自动跳过输出文件中已有的 `id`，无需额外参数。加 `--overwrite` 从头开始。
+
+## Step 6 — 评估
+
+预测完成后，在本地或服务器上运行评估：
+
+```bash
+python scripts/evaluation/evaluate_predictions.py \
+  --predictions outputs/predictions/lora_poi_triple.jsonl \
+  --alignment-csv dataset/sat_ntl_svi_aligned/streetview_satellite_ntl_alignment.csv
+```
