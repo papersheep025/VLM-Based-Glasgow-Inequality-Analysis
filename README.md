@@ -119,7 +119,7 @@
 
 ```bash
 python3 scripts/inference/predict_qwen3_vl_plus_api.py \
-  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_all.jsonl \
   --output-jsonl outputs/predictions/qwen3_simple_full.jsonl \
   --input-mode triple --task explain \
   --prompt simple \
@@ -130,7 +130,7 @@ python3 scripts/inference/predict_qwen3_vl_plus_api.py \
 
 ```bash
 python3 scripts/inference/predict_qwen3_vl_plus_api.py \
-  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_all.jsonl \
   --output-jsonl outputs/predictions/qwen3_structured_full.jsonl \
   --input-mode triple --task explain \
   --prompt structured
@@ -140,7 +140,7 @@ python3 scripts/inference/predict_qwen3_vl_plus_api.py \
 
 ```bash
 python3 scripts/inference/predict_qwen3_vl_plus_api.py \
-  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_all.jsonl \
   --output-jsonl outputs/predictions/qwen3_structured_plus_full.jsonl \
   --input-mode triple --task explain \
   --prompt structured_plus
@@ -150,7 +150,7 @@ python3 scripts/inference/predict_qwen3_vl_plus_api.py \
 
 ```bash
 python3 scripts/inference/predict_qwen3_vl_plus_api.py \
-  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_all.jsonl \
   --output-jsonl outputs/predictions/qwen3_reasoning_full.jsonl \
   --input-mode triple --task explain \
   --prompt structured_reasoning \
@@ -216,7 +216,7 @@ system  →  user(示例1图片+prompt+POI) → assistant(示例1标注)
 
 ```bash
 python3 scripts/inference/predict_fewshot_api.py \
-  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_all.jsonl \
   --output-jsonl outputs/predictions/qwen3_fewshot_full.jsonl \
   --input-mode triple --task explain
 ```
@@ -225,7 +225,7 @@ python3 scripts/inference/predict_fewshot_api.py \
 
 ```bash
 python3 scripts/inference/predict_fewshot_api.py \
-  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_all.jsonl \
   --output-jsonl outputs/predictions/qwen3_fewshot_q15_full.jsonl \
   --input-mode triple --task explain \
   --few-shot-quintiles 1 5
@@ -235,7 +235,7 @@ python3 scripts/inference/predict_fewshot_api.py \
 
 ```bash
 python3 scripts/inference/predict_fewshot_poi_api.py \
-  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_all.jsonl \
   --output-jsonl outputs/predictions/qwen3_fewshot_poi_full.jsonl \
   --input-mode triple --task explain
 ```
@@ -244,7 +244,7 @@ python3 scripts/inference/predict_fewshot_poi_api.py \
 
 ```bash
 python3 scripts/inference/predict_fewshot_poi_api.py \
-  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_all.jsonl \
   --output-jsonl outputs/predictions/qwen3_fewshot_poi_q15_full.jsonl \
   --input-mode triple --task explain \
   --few-shot-quintiles 1 5
