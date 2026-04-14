@@ -34,6 +34,8 @@ import os
 import sys
 from pathlib import Path
 
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+
 import torch
 from datasets import load_from_disk
 from PIL import Image

@@ -221,7 +221,7 @@ python3 scripts/inference/predict_fewshot_api.py \
   --input-mode triple --task explain
 ```
 
-仅使用 quintile 1 和 5 作为对比示例：
+仅使用 quintile 1 和 5 作为对比示例（4600token）：
 
 ```bash
 python3 scripts/inference/predict_fewshot_api.py \
