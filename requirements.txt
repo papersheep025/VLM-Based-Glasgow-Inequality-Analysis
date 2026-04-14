@@ -11,6 +11,8 @@ safetensors
 # Evaluation / analysis
 scikit-learn==1.8.0
 scipy==1.17.1
+libpysal
+esda
 
 # Geospatial pipeline
 geopandas==1.1.3

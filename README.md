@@ -676,3 +676,177 @@ python scripts/evaluation/evaluate_predictions.py \
   --predictions outputs/predictions/lora_poi_triple.jsonl \
   --alignment-csv dataset/sat_ntl_svi_aligned/streetview_satellite_ntl_alignment.csv
 ```
+
+---
+
+# 领域分数评估与可视化
+
+本节针对 `prediction_json` 含有领域评分（`income`、`employment` 等 7 个域 + `overall`）的预测文件，提供从样本聚合到可视化的完整流程。
+
+## 数据格式
+
+每条预测记录格式如下：
+
+```json
+{
+  "id": "S01010065__S01010065_9210_0.jpg",
+  "datazone": "S01010065",
+  "prediction_json": {
+    "income": 5, "employment": 6, "health": 7, "education": 5,
+    "housing": 4, "access": 7, "crime": 6, "overall": 5.82,
+    "built_environment_quality_score": 4, ...
+  },
+  "model": "qwen3-vl-plus"
+}
+```
+
+ground truth 来自 `dataset/SIMD/SIMD_data.csv`，对应字段：`income_score`、`employment_score`、`health_score`、`education_score`、`housing_score`、`access_score`、`crime_score`、`overall_score`（均为 1–10 整数或浮点）。
+
+## Step 1 — 聚合到 datazone
+
+将样本级预测按 datazone 聚合，同时输出均值、中位数、标准差和标准误，用于后续的不确定性分析和加权评估。
+
+```bash
+python scripts/evaluation/aggregate_domain_scores.py \
+  --pred-jsonl outputs/predictions/qwen3_fewshot_poi_q15_full.jsonl \
+  --output-csv outputs/datazone_domain_scores.csv
+```
+
+输出 `outputs/datazone_domain_scores.csv`，746 行。每个 domain 字段（16 个）输出 4 列：
+
+| 列后缀 | 含义 |
+| --- | --- |
+| `{field}` | 样本均值（主预测值） |
+| `{field}_median` | 样本中位数（鲁棒估计） |
+| `{field}_std` | 样本标准差（组内分散程度） |
+| `{field}_sem` | 标准误 = std / √n（均值估计的不确定性） |
+
+## Step 2 — 与 SIMD 对比评估
+
+计算所有领域的多维度指标（含 95% Bootstrap CI），并与 baseline 对比；可选输出空间自相关分析结果（需 `libpysal` + `esda`）。
+
+```bash
+python scripts/evaluation/evaluate_domain_scores.py \
+  --pred-csv outputs/datazone_domain_scores.csv \
+  --simd-csv dataset/SIMD/SIMD_data.csv \
+  --shapefile dataset/glasgow_datazone/glasgow_datazone.shp \
+  --output-csv outputs/domain_evaluation_report.csv
+```
+
+不需要空间分析时加 `--no-spatial` 跳过（无需 `libpysal`）：
+
+```bash
+python scripts/evaluation/evaluate_domain_scores.py \
+  --pred-csv outputs/datazone_domain_scores.csv \
+  --simd-csv dataset/SIMD/SIMD_data.csv \
+  --output-csv outputs/domain_evaluation_report.csv \
+  --no-spatial
+```
+
+**计算指标（每项均报告 95% Bootstrap CI）：**
+
+| 指标 | 说明 |
+| --- | --- |
+| RMSE | 均方根误差（主要指标） |
+| MAE | 平均绝对误差，比 RMSE 对异常值更鲁棒 |
+| Accuracy | 预测值取整后与 SIMD 整数分完全命中率 |
+| Within-1 Acc | 预测误差 ≤1 分的比例（宽松准确率） |
+| Pearson r | 线性相关 |
+| Spearman ρ | 秩相关（排名任务最重要的指标） |
+| R² | 决定系数，预测值对真实方差的解释比例 |
+| QWK | Quadratic Weighted Kappa，有序分类标准指标 |
+
+**Baseline 对比（自动计算，无需额外输入）：**
+
+| Baseline | 说明 |
+| --- | --- |
+| `baseline_mean` | 对每个 domain 永远预测全集均值（零信息下界） |
+| `baseline_spatial_lag` | 用 queen contiguity 邻域 SIMD 均值预测（检验模型是否超过空间自相关） |
+
+**空间自相关（需 `libpysal` + `esda`）：**
+
+对每个 domain 的残差（pred − true）计算全局 Moran's I + 置换检验 p 值，以及局部 LISA quadrant。
+
+**输出文件：**
+
+| 文件 | 内容 |
+| --- | --- |
+| `outputs/domain_evaluation_report.csv` | 所有指标含 CI，含 VLM + baseline 行，列：`domain, source, N, RMSE, RMSE_lo, RMSE_hi, ...` |
+| `outputs/domain_evaluation_by_quintile.csv` | 按 SIMD Quintile（1–5）分组的细粒度指标，含 CI |
+| `outputs/domain_moran_results.csv` | 每个 domain 的 Moran's I、EI、p_sim、z_sim（仅启用空间分析时） |
+| `outputs/domain_evaluation_report_merged.csv` | 预测与 SIMD 合并完整表，含 LISA quadrant 列（`{domain}_lisa_q`、`{domain}_lisa_p`） |
+
+## Step 3 — 可视化
+
+生成 5 张静态论文级图表（PNG + PDF）和 1 张交互式 Glasgow 地图（HTML）。
+
+```bash
+python scripts/evaluation/visualize_domain_scores.py \
+  --pred-csv outputs/datazone_domain_scores.csv \
+  --simd-csv dataset/SIMD/SIMD_data.csv \
+  --shapefile dataset/glasgow_datazone/glasgow_datazone.shp \
+  --output-dir outputs/figures
+```
+
+加 `--no-pdf` 可跳过 PDF 输出加快速度。
+
+**输出文件：**
+
+| 文件 | 内容 |
+| --- | --- |
+| `fig1_domain_scatter.png/pdf` | 8 个领域预测 vs 真实散点图，含 Spearman ρ 和 RMSE，点按 SIMD Quintile 染色 |
+| `fig2_domain_error_bar.png/pdf` | RMSE + MAE 并排条形图，含 bootstrap 95% 置信区间 |
+| `fig3_error_by_quintile.png/pdf` | 各领域预测误差（Pred − True）× SIMD Quintile violin 图，检验系统性偏差 |
+| `fig4_correlation_heatmap.png/pdf` | 预测域 × 真实域 Spearman 相关热力图（8×8），对角线加框突出同域相关 |
+| `fig4b_diagonal_correlation.png/pdf` | 同域预测相关性 vs SIMD 域间基线的横向 bar chart，直观对比模型区分能力 |
+| `fig5_glasgow_map.html` | Glasgow datazone 交互式地图，下拉切换：预测分 / 真实分 / 预测误差（色标对称于 0）/ 高估区域 / 低估区域 |
+
+**fig5 图层说明：**
+
+| 图层 | 内容 |
+| --- | --- |
+| Predicted Overall Score | VLM 预测的 overall 分 |
+| True Overall Score (SIMD) | SIMD 2020 ground truth |
+| Prediction Error (Pred − True) | 误差，色标以 0 为中心对称（蓝=低估，红=高估） |
+| Overestimation (error > +1) | 被高估超过 1 分的 datazone 高亮（红色） |
+| Underestimation (error < −1) | 被低估超过 1 分的 datazone 高亮（蓝色） |
+
+## 相关文件
+
+- `scripts/evaluation/aggregate_domain_scores.py` — 样本聚合到 datazone（输出均值/中位数/std/sem）
+- `scripts/evaluation/evaluate_domain_scores.py` — 与 SIMD ground truth 对比计算指标（含 Bootstrap CI、分 Quintile、Baseline、Moran's I）
+- `scripts/evaluation/visualize_domain_scores.py` — 可视化（5 张静态图 + 交互式地图）
+- `dataset/SIMD/SIMD_data.csv` — SIMD 2020 ground truth（domain rank 映射为 1–10 分数）
+- `dataset/glasgow_datazone/glasgow_datazone.shp` — 格拉斯哥 datazone 矢量边界
+
+---
+
+# 输出数据汇总
+
+运行完整评估流程后，`outputs/` 目录下产生以下数据：
+
+## 聚合预测
+
+| 文件 | 行数 | 说明 |
+| --- | --- | --- |
+| `outputs/datazone_domain_scores.csv` | 746 | 每个 datazone 的 16 个域/环境分数（均值 + 中位数 + std + sem） |
+
+## 评估报告
+
+| 文件 | 说明 |
+| --- | --- |
+| `outputs/domain_evaluation_report.csv` | 8 个 domain × 3 个 source（vlm / baseline_mean / baseline_spatial_lag）的完整指标表，每指标含 `_lo` / `_hi` 95% CI 列 |
+| `outputs/domain_evaluation_by_quintile.csv` | 按 SIMD Quintile（1–5）分组的细粒度评估，共 8×5=40 行 |
+| `outputs/domain_moran_results.csv` | 8 个 domain 残差的全局 Moran's I + 置换检验结果 |
+| `outputs/domain_evaluation_report_merged.csv` | 746 行完整合并表：预测均值 + SIMD ground truth + LISA quadrant 列（`{domain}_lisa_q` / `{domain}_lisa_p`） |
+
+## 可视化图表
+
+| 文件 | 格式 | 说明 |
+| --- | --- | --- |
+| `outputs/figures/fig1_domain_scatter` | PNG + PDF | 8 域散点图（按 quintile 染色） |
+| `outputs/figures/fig2_domain_error_bar` | PNG + PDF | RMSE + MAE 条形图（含 95% CI） |
+| `outputs/figures/fig3_error_by_quintile` | PNG + PDF | 误差分布 violin 图（按 quintile 分组） |
+| `outputs/figures/fig4_correlation_heatmap` | PNG + PDF | 8×8 跨域 Spearman 相关热力图 |
+| `outputs/figures/fig4b_diagonal_correlation` | PNG + PDF | 同域预测相关性 vs 域间基线对比 bar chart |
+| `outputs/figures/fig5_glasgow_map.html` | HTML | 交互式 Glasgow 地图（5 个下拉图层） |
