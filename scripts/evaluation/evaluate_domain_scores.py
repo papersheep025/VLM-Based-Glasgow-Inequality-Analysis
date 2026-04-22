@@ -26,7 +26,7 @@ from sklearn.metrics import (
     r2_score,
 )
 
-DOMAIN_MAP = {
+DOMAIN_MAP_STANDARD = {
     "income": "income_score",
     "employment": "employment_score",
     "health": "health_score",
@@ -36,6 +36,26 @@ DOMAIN_MAP = {
     "crime": "crime_score",
     "overall": "overall_score",
 }
+
+DOMAIN_MAP_PRECISE = {
+    "income": "Income",
+    "employment": "Employment",
+    "health": "Health",
+    "education": "Education",
+    "housing": "Housing",
+    "access": "Access",
+    "crime": "Crime",
+    "overall": "Overall",
+}
+
+
+def _detect_domain_map(simd_df: pd.DataFrame) -> dict:
+    if "income_score" in simd_df.columns:
+        return DOMAIN_MAP_STANDARD
+    return DOMAIN_MAP_PRECISE
+
+
+DOMAIN_MAP = DOMAIN_MAP_STANDARD
 
 N_BOOTSTRAP = 500
 BOOTSTRAP_SEED = 42
@@ -61,6 +81,12 @@ def parse_args():
         type=Path,
         default=Path("outputs/domain_evaluation_report.csv"),
         help="Output metrics CSV path",
+    )
+    parser.add_argument(
+        "--rank-csv",
+        type=Path,
+        default=Path("dataset/SIMD/SIMD_data.csv"),
+        help="CSV containing SIMD2020v2_Rank column (used for rank-band breakdown)",
     )
     parser.add_argument(
         "--no-spatial",
@@ -157,18 +183,18 @@ def compute_metrics(pred: np.ndarray, true: np.ndarray, rng: np.random.Generator
     }
 
 
-def compute_metrics_by_quintile(merged: pd.DataFrame) -> pd.DataFrame:
+def compute_metrics_by_rank_band(merged: pd.DataFrame) -> pd.DataFrame:
     rng = np.random.default_rng(BOOTSTRAP_SEED)
     records = []
     for pred_col, true_col in DOMAIN_MAP.items():
-        for q in sorted(merged["SIMD2020v2_Quintile"].dropna().unique()):
-            sub = merged[merged["SIMD2020v2_Quintile"] == q]
+        for band in sorted(merged["rank_band"].dropna().unique()):
+            sub = merged[merged["rank_band"] == band]
             m = compute_metrics(sub[pred_col].to_numpy(float), sub[true_col].to_numpy(float), rng)
             m["domain"] = pred_col
-            m["quintile"] = int(q)
+            m["rank_band"] = int(band)
             records.append(m)
     df = pd.DataFrame(records)
-    cols = ["domain", "quintile"] + [c for c in df.columns if c not in ("domain", "quintile")]
+    cols = ["domain", "rank_band"] + [c for c in df.columns if c not in ("domain", "rank_band")]
     return df[cols]
 
 
@@ -256,11 +282,22 @@ def main():
     pred_df = pd.read_csv(args.pred_csv)
     simd_df = pd.read_csv(args.simd_csv)
 
+    domain_map = _detect_domain_map(simd_df)
+
+    rank_df = pd.read_csv(args.rank_csv, usecols=["datazone", "SIMD2020v2_Rank"])
+    simd_df = simd_df.merge(rank_df, on="datazone", how="left")
+    simd_df["rank_band"] = pd.qcut(
+        simd_df["SIMD2020v2_Rank"], q=5, labels=[1, 2, 3, 4, 5]
+    ).astype(int)
+
     merged = pred_df.merge(
-        simd_df[["datazone"] + list(DOMAIN_MAP.values()) + ["SIMD2020v2_Quintile", "SIMD2020v2_Rank"]],
+        simd_df[["datazone"] + list(domain_map.values()) + ["SIMD2020v2_Rank", "rank_band"]],
         on="datazone", how="inner",
     )
     print(f"Merged {len(merged)} datazones (pred={len(pred_df)}, simd={len(simd_df)})")
+
+    global DOMAIN_MAP
+    DOMAIN_MAP = domain_map
 
     rng = np.random.default_rng(BOOTSTRAP_SEED)
     records = []
@@ -312,13 +349,13 @@ def main():
     report.to_csv(args.output_csv, index=False, encoding="utf-8")
     print(f"\nSaved main report → {args.output_csv}")
 
-    quintile_report = compute_metrics_by_quintile(merged)
+    rank_band_report = compute_metrics_by_rank_band(merged)
     stem = args.output_csv.stem
     base = args.output_csv.parent
-    quintile_path = base / (stem.replace("report", "by_quintile") if "report" in stem else stem + "_by_quintile")
-    quintile_path = quintile_path.with_suffix(".csv")
-    quintile_report.to_csv(quintile_path, index=False, encoding="utf-8")
-    print(f"Saved per-quintile report → {quintile_path}")
+    rank_band_path = base / (stem.replace("report", "by_rank_band") if "report" in stem else stem + "_by_rank_band")
+    rank_band_path = rank_band_path.with_suffix(".csv")
+    rank_band_report.to_csv(rank_band_path, index=False, encoding="utf-8")
+    print(f"Saved per-rank-band report → {rank_band_path}")
 
     merged_out = base / (stem + "_merged.csv")
     if gdf is not None and not args.no_spatial:

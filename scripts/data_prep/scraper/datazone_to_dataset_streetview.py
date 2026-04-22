@@ -23,10 +23,10 @@ STREETVIEW_JSON = os.path.join(OUTPUT_DIR, "glasgow_streetview.json")
 STREETVIEW_JSONL = os.path.join(OUTPUT_DIR, "glasgow_streetview.jsonl")
 METADATA_CSV = os.path.join(OUTPUT_DIR, "metadata.csv")
 CHECKPOINT_FILE = os.path.join(OUTPUT_DIR, "checkpoint_streetview.json")
-ACCESS_TOKEN = "MLYATgedGw5TDFZCzgbA4jIsR0BoZCCirUUIX11LwhEPI1nTjg3xdnsqcfVSdWfKdK5jjZAxUrTH15ylblYcJLWwvCdreIymoXED7wAJ3a6xlcDoXfOpuOZAY79n0X14wZDZD"  # User Access Token
+ACCESS_TOKEN = "MLY|26936598692612655|7d5ba6e8dd0a2d86c57c977fc0d3d3cd"  # User Access Token
 
 POINTS_PER_ZONE = 30  # 每个 DataZone 采样点数量
-SEARCH_RADIUS = 50   # 米，不再使用，但保留
+SEARCH_RADIUS = 10   # 米，不再使用，但保留
 CHECKPOINT_EVERY_POINTS = 5  # 每处理多少个采样点写一次断点
 
 # 创建输出目录

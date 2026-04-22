@@ -619,16 +619,18 @@ final_adapter/
 ```bash
 # 纯图像 adapter
 python scripts/inference/predict_lora_local.py \
-  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_all.jsonl \
   --output-jsonl outputs/predictions/lora_triple_preview.jsonl \
   --adapter-path outputs/lora_adapters_cuda/final_adapter \
+  --base-model-id /home/16T/xyq/glasgow/models/Qwen3-VL-8B-Instruct \
   --input-mode triple --task explain --max-samples 5
 
 # 图像 + POI adapter
 python scripts/inference/predict_lora_local.py \
-  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_all.jsonl \
   --output-jsonl outputs/predictions/lora_poi_triple_preview.jsonl \
   --adapter-path outputs/lora_adapters_poi_cuda/final_adapter \
+  --base-model-id /home/16T/xyq/glasgow/models/Qwen3-VL-8B-Instruct \
   --input-mode triple --task explain --max-samples 5
 ```
 
@@ -637,16 +639,18 @@ python scripts/inference/predict_lora_local.py \
 ```bash
 # 纯图像
 python scripts/inference/predict_lora_local.py \
-  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_all.jsonl \
   --output-jsonl outputs/predictions/lora_triple.jsonl \
   --adapter-path outputs/lora_adapters_cuda/final_adapter \
+  --base-model-id /home/16T/xyq/glasgow/models/Qwen3-VL-8B-Instruct \
   --input-mode triple --task explain
 
 # 图像 + POI
 python scripts/inference/predict_lora_local.py \
-  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_test.jsonl \
+  --input-jsonl dataset/sat_ntl_svi_aligned/vlm_data/triple_explain_all.jsonl \
   --output-jsonl outputs/predictions/lora_poi_triple.jsonl \
   --adapter-path outputs/lora_adapters_poi_cuda/final_adapter \
+  --base-model-id /home/16T/xyq/glasgow/models/Qwen3-VL-8B-Instruct \
   --input-mode triple --task explain
 ```
 

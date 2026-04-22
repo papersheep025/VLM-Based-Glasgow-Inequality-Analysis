@@ -46,7 +46,7 @@ mpl.rcParams.update(
     }
 )
 
-DOMAIN_MAP = {
+DOMAIN_MAP_STANDARD = {
     "income": "income_score",
     "employment": "employment_score",
     "health": "health_score",
@@ -56,6 +56,19 @@ DOMAIN_MAP = {
     "crime": "crime_score",
     "overall": "overall_score",
 }
+
+DOMAIN_MAP_PRECISE = {
+    "income": "Income",
+    "employment": "Employment",
+    "health": "Health",
+    "education": "Education",
+    "housing": "Housing",
+    "access": "Access",
+    "crime": "Crime",
+    "overall": "Overall",
+}
+
+DOMAIN_MAP = DOMAIN_MAP_STANDARD
 DOMAIN_LABELS = {
     "income": "Income",
     "employment": "Employment",
@@ -73,16 +86,31 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Visualize domain predictions vs SIMD ground truth.")
     parser.add_argument("--pred-csv", type=Path, required=True)
     parser.add_argument("--simd-csv", type=Path, default=Path("dataset/SIMD/SIMD_data.csv"))
+    parser.add_argument("--rank-csv", type=Path, default=Path("dataset/SIMD/SIMD_data.csv"),
+                        help="CSV containing SIMD2020v2_Rank (for rank-band coloring)")
     parser.add_argument("--shapefile", type=Path, default=Path("dataset/glasgow_datazone/glasgow_datazone.shp"))
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/figures"))
     parser.add_argument("--no-pdf", action="store_true", help="Skip PDF output (faster)")
     return parser.parse_args()
 
 
-def load_merged(pred_csv: Path, simd_csv: Path) -> pd.DataFrame:
+def load_merged(pred_csv: Path, simd_csv: Path, rank_csv: Path) -> pd.DataFrame:
+    global DOMAIN_MAP
     pred = pd.read_csv(pred_csv)
     simd = pd.read_csv(simd_csv)
-    keep = ["datazone"] + list(DOMAIN_MAP.values()) + ["SIMD2020v2_Quintile", "SIMD2020v2_Rank"]
+
+    if "income_score" in simd.columns:
+        DOMAIN_MAP = DOMAIN_MAP_STANDARD
+    else:
+        DOMAIN_MAP = DOMAIN_MAP_PRECISE
+
+    rank_df = pd.read_csv(rank_csv, usecols=["datazone", "SIMD2020v2_Rank"])
+    simd = simd.merge(rank_df, on="datazone", how="left")
+    simd["rank_band"] = pd.qcut(
+        simd["SIMD2020v2_Rank"], q=5, labels=[1, 2, 3, 4, 5]
+    ).astype(int)
+
+    keep = ["datazone"] + list(DOMAIN_MAP.values()) + ["SIMD2020v2_Rank", "rank_band"]
     return pred.merge(simd[keep], on="datazone", how="inner")
 
 
@@ -108,11 +136,11 @@ def fig1_domain_scatter(df: pd.DataFrame, out: Path, no_pdf: bool):
         mask = df[pred_col].notna() & df[true_col].notna()
         x = df.loc[mask, true_col].to_numpy(float)
         y = df.loc[mask, pred_col].to_numpy(float)
-        quintiles = df.loc[mask, "SIMD2020v2_Quintile"].to_numpy(int)
+        rank_bands = df.loc[mask, "rank_band"].to_numpy(int)
 
         for q in range(1, 6):
-            idx = quintiles == q
-            ax.scatter(x[idx], y[idx], c=[QUINTILE_PALETTE[q - 1]], s=14, alpha=0.75, linewidths=0, label=f"Q{q}")
+            idx = rank_bands == q
+            ax.scatter(x[idx], y[idx], c=[QUINTILE_PALETTE[q - 1]], s=14, alpha=0.75, linewidths=0, label=f"B{q}")
 
         lo, hi = min(x.min(), y.min()) - 0.3, max(x.max(), y.max()) + 0.3
         ax.plot([lo, hi], [lo, hi], color="black", linewidth=0.8, linestyle="--", alpha=0.5)
@@ -129,8 +157,8 @@ def fig1_domain_scatter(df: pd.DataFrame, out: Path, no_pdf: bool):
         ax.set_ylim(lo, hi)
         ax.set_aspect("equal")
 
-    handles = [mpl.patches.Patch(color=QUINTILE_PALETTE[q], label=f"Quintile {q+1}") for q in range(5)]
-    fig.legend(handles=handles, title="SIMD Quintile\n(1=most deprived)", loc="lower center",
+    handles = [mpl.patches.Patch(color=QUINTILE_PALETTE[q], label=f"Band {q+1}") for q in range(5)]
+    fig.legend(handles=handles, title="SIMD Rank Band\n(1=most deprived)", loc="lower center",
                ncol=5, frameon=True, fontsize=8, title_fontsize=8,
                bbox_to_anchor=(0.5, -0.04))
     fig.tight_layout()
@@ -191,33 +219,33 @@ def fig2_domain_error_bar(df: pd.DataFrame, out: Path, no_pdf: bool):
 
 
 # ── Figure 3: Error × SIMD Quintile violin ────────────────────────────────────
-def fig3_error_by_quintile(df: pd.DataFrame, out: Path, no_pdf: bool):
+def fig3_error_by_rank_band(df: pd.DataFrame, out: Path, no_pdf: bool):
     domain_cols = [d for d in DOMAIN_MAP if d != "overall"]
     records = []
     for domain in domain_cols:
         pred = df[domain].to_numpy(float)
         true = df[DOMAIN_MAP[domain]].to_numpy(float)
-        quintile = df["SIMD2020v2_Quintile"].to_numpy()
+        rank_band = df["rank_band"].to_numpy()
         mask = ~(np.isnan(pred) | np.isnan(true))
-        for p, t, q in zip(pred[mask], true[mask], quintile[mask]):
-            records.append({"domain": DOMAIN_LABELS[domain], "error": p - t, "quintile": int(q)})
+        for p, t, b in zip(pred[mask], true[mask], rank_band[mask]):
+            records.append({"domain": DOMAIN_LABELS[domain], "error": p - t, "rank_band": int(b)})
 
     long_df = pd.DataFrame(records)
     fig, ax = plt.subplots(figsize=(14, 5))
     sns.violinplot(
-        data=long_df, x="domain", y="error", hue="quintile",
+        data=long_df, x="domain", y="error", hue="rank_band",
         palette="RdYlGn", inner="quartile", linewidth=0.7,
         density_norm="width", cut=0, ax=ax, legend=True,
     )
     ax.axhline(0, color="black", linewidth=0.8, linestyle="--", alpha=0.7)
     ax.set_xlabel("Domain", fontsize=10)
     ax.set_ylabel("Prediction Error (Pred − True)", fontsize=10)
-    ax.set_title("Prediction Error Distribution by SIMD Quintile", fontsize=12, fontweight="bold")
+    ax.set_title("Prediction Error Distribution by SIMD Rank Band", fontsize=12, fontweight="bold")
     handles, labels_ = ax.get_legend_handles_labels()
-    ax.legend(handles, [f"Q{l}" for l in labels_], title="SIMD Quintile\n(1=most deprived)",
+    ax.legend(handles, [f"B{l}" for l in labels_], title="SIMD Rank Band\n(1=most deprived)",
               fontsize=8, title_fontsize=8, loc="upper right")
     fig.tight_layout()
-    save(fig, out / "fig3_error_by_quintile", no_pdf)
+    save(fig, out / "fig3_error_by_rank_band", no_pdf)
 
 
 # ── Figure 4: Cross-domain Spearman heatmap ───────────────────────────────────
@@ -322,7 +350,8 @@ def fig5_glasgow_map(df: pd.DataFrame, shapefile: Path, out: Path):
 
     gdf = gdf.rename(columns={id_col: "datazone"})
     df = df.copy()
-    df["error_overall"] = df["overall"] - df["overall_score"]
+    true_overall_col = DOMAIN_MAP["overall"]
+    df["error_overall"] = df["overall"] - df[true_overall_col]
     df["overestimation"] = (df["error_overall"] > 1).astype(float)
     df["underestimation"] = (df["error_overall"] < -1).astype(float)
 
@@ -340,11 +369,11 @@ def fig5_glasgow_map(df: pd.DataFrame, shapefile: Path, out: Path):
             "zmax": merged_geo["overall"].quantile(0.98),
         },
         "True Overall Score (SIMD)": {
-            "col": "overall_score",
+            "col": true_overall_col,
             "colorscale": "RdYlGn",
             "reversescale": False,
-            "zmin": merged_geo["overall_score"].quantile(0.02),
-            "zmax": merged_geo["overall_score"].quantile(0.98),
+            "zmin": merged_geo[true_overall_col].quantile(0.02),
+            "zmax": merged_geo[true_overall_col].quantile(0.98),
         },
         "Prediction Error (Pred − True)": {
             "col": "error_overall",
@@ -427,13 +456,100 @@ def fig5_glasgow_map(df: pd.DataFrame, shapefile: Path, out: Path):
     print(f"  Saved {html_path}")
 
 
+# ── Figure 6: LISA cluster maps ─────────────────────────────────────────────
+def fig6_lisa_cluster_map(
+    df: pd.DataFrame, shapefile: Path, out: Path, no_pdf: bool, p_threshold: float = 0.05
+):
+    try:
+        import libpysal.weights as lps_w
+        import esda
+    except ImportError:
+        print("  [warn] libpysal/esda not installed; skipping LISA cluster maps")
+        return
+
+    gdf = gpd.read_file(shapefile)
+    id_col = next(
+        (c for c in gdf.columns if "zone" in c.lower() or "dz" in c.lower()
+         or c.lower() in ("code", "datazone", "data_zone")),
+        gdf.columns[0],
+    )
+    gdf = gdf.rename(columns={id_col: "datazone"})
+    overlap_cols = set(gdf.columns) & set(df.columns) - {"datazone", "geometry"}
+    if overlap_cols:
+        gdf = gdf.drop(columns=list(overlap_cols))
+    merged_geo = gdf.merge(df, on="datazone", how="inner")
+
+    w = lps_w.Queen.from_dataframe(merged_geo, silence_warnings=True)
+    w.transform = "r"
+
+    LISA_COLORS = {
+        0: "#d9d9d9",  # Not significant
+        1: "#d7191c",  # HH — cluster of overestimation
+        2: "#89cff0",  # LH — low surrounded by high
+        3: "#2c7bb6",  # LL — cluster of underestimation
+        4: "#fdae61",  # HL — high surrounded by low
+    }
+    LISA_LABELS = {
+        0: "Not Significant",
+        1: "High-High (overest. cluster)",
+        2: "Low-High (spatial outlier)",
+        3: "Low-Low (underest. cluster)",
+        4: "High-Low (spatial outlier)",
+    }
+
+    domains = list(DOMAIN_MAP.keys())
+    ncols = 4
+    nrows = 2
+    fig, axes = plt.subplots(nrows, ncols, figsize=(20, 10))
+    fig.suptitle(
+        f"LISA Cluster Maps — Prediction Residuals (p < {p_threshold})",
+        fontsize=14, fontweight="bold", y=1.01,
+    )
+
+    for ax, domain in zip(axes.flat, domains):
+        true_col = DOMAIN_MAP[domain]
+        pred_vals = merged_geo[domain].to_numpy(float)
+        true_vals = merged_geo[true_col].to_numpy(float)
+        residuals = pred_vals - true_vals
+        residuals = np.where(np.isnan(residuals), 0.0, residuals)
+
+        lisa = esda.Moran_Local(residuals, w, permutations=999, seed=42)
+
+        cluster = np.zeros(len(merged_geo), dtype=int)
+        sig = lisa.p_sim < p_threshold
+        cluster[sig] = lisa.q[sig]
+
+        merged_geo[f"_lisa_cls_{domain}"] = cluster
+        colors = merged_geo[f"_lisa_cls_{domain}"].map(LISA_COLORS)
+
+        merged_geo.plot(ax=ax, color=colors, edgecolor="#aaaaaa", linewidth=0.2)
+        ax.set_title(DOMAIN_LABELS[domain], fontsize=11, fontweight="bold")
+        ax.set_axis_off()
+
+        n_sig = int(sig.sum())
+        ax.text(
+            0.02, 0.02, f"{n_sig} sig. ({n_sig * 100 / len(merged_geo):.1f}%)",
+            transform=ax.transAxes, fontsize=8, va="bottom",
+            bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="#cccccc", alpha=0.8),
+        )
+
+    from matplotlib.patches import Patch
+    legend_handles = [Patch(facecolor=LISA_COLORS[k], edgecolor="#666666", label=LISA_LABELS[k]) for k in sorted(LISA_LABELS)]
+    fig.legend(
+        handles=legend_handles, loc="lower center", ncol=5,
+        frameon=True, fontsize=8, bbox_to_anchor=(0.5, -0.03),
+    )
+    fig.tight_layout()
+    save(fig, out / "fig6_lisa_cluster_map", no_pdf)
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     print("Loading data...")
-    df = load_merged(args.pred_csv, args.simd_csv)
+    df = load_merged(args.pred_csv, args.simd_csv, args.rank_csv)
     print(f"  {len(df)} datazones loaded")
 
     print("\n[Fig 1] Domain scatter matrix...")
@@ -442,8 +558,8 @@ def main():
     print("[Fig 2] Domain error bar chart...")
     fig2_domain_error_bar(df, args.output_dir, args.no_pdf)
 
-    print("[Fig 3] Error × quintile violins...")
-    fig3_error_by_quintile(df, args.output_dir, args.no_pdf)
+    print("[Fig 3] Error × rank-band violins...")
+    fig3_error_by_rank_band(df, args.output_dir, args.no_pdf)
 
     print("[Fig 4] Spearman correlation heatmap...")
     fig4_correlation_heatmap(df, args.output_dir, args.no_pdf)
@@ -453,6 +569,9 @@ def main():
 
     print("[Fig 5] Interactive Glasgow map...")
     fig5_glasgow_map(df, args.shapefile, args.output_dir)
+
+    print("[Fig 6] LISA cluster maps...")
+    fig6_lisa_cluster_map(df, args.shapefile, args.output_dir, args.no_pdf)
 
     print(f"\nAll outputs written to {args.output_dir}/")
 

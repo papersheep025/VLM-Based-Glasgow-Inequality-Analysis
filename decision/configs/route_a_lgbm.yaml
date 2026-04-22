@@ -1,0 +1,31 @@
+# Route A' — LightGBM decision layer (per-fold PCA + 7 independent regressors).
+# Consumed by `python -m decision.train.cv_runner_lgbm --config <this file>`.
+# CLI flags override YAML values.
+
+dataset: outputs/decision/dataset_v0.jsonl
+out_dir: outputs/decision/route_a_lgbm/bge_m3_v0
+
+encoder:
+  name: BAAI/bge-m3
+  batch_size: 32
+
+cv:
+  n_splits: 5
+
+train:
+  # feature reduction
+  pca_dim: 32                  # per-segment PCA target dim; X = 4*pca_dim + POI
+
+  # LightGBM hyperparameters (shared across 7 domain models)
+  objective: regression        # L2; alternatives: huber, regression_l1
+  n_estimators: 2000
+  learning_rate: 0.03
+  num_leaves: 31
+  min_data_in_leaf: 20
+  feature_fraction: 0.8
+  bagging_fraction: 0.8
+  bagging_freq: 5
+  lambda_l2: 1.0
+
+  early_stopping_rounds: 100
+  seed: 42

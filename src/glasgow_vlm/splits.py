@@ -2,6 +2,12 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict
+from pathlib import Path
+from typing import Iterator
+
+import geopandas as gpd
+import pandas as pd
+from sklearn.model_selection import StratifiedGroupKFold
 
 
 def stratified_group_split(
@@ -53,3 +59,41 @@ def stratified_group_split(
 
     return collect(train_groups), collect(val_groups), collect(test_groups)
 
+
+DEFAULT_SHP = "dataset/glasgow_datazone/glasgow_datazone.shp"
+DEFAULT_SIMD = "dataset/SIMD/SIMD_precise.csv"
+
+
+def load_datazone_iz_map(shp_path: str | Path = DEFAULT_SHP) -> pd.DataFrame:
+    gdf = gpd.read_file(shp_path)
+    return gdf[["DataZone", "Intermedia"]].rename(
+        columns={"DataZone": "datazone", "Intermedia": "intermediate_zone"}
+    )
+
+
+def group_kfold_by_iz(
+    datazones: list[str],
+    n_splits: int = 5,
+    strata_col: str = "Overall",
+    n_strata: int = 5,
+    shp_path: str | Path = DEFAULT_SHP,
+    simd_path: str | Path = DEFAULT_SIMD,
+    seed: int = 42,
+) -> Iterator[tuple[list[str], list[str]]]:
+    """Yield (train_datazones, val_datazones) for each of K folds.
+
+    Groups are Intermediate Zones (cuts spatial autocorrelation). Folds are
+    stratified on quantile bins of `strata_col` from SIMD_precise.csv so each
+    fold has a comparable SIMD distribution.
+    """
+    iz_map = load_datazone_iz_map(shp_path)
+    simd = pd.read_csv(simd_path)
+
+    df = pd.DataFrame({"datazone": list(datazones)}).merge(iz_map, on="datazone")
+    df = df.merge(simd[["datazone", strata_col]], on="datazone")
+    df["strata"] = pd.qcut(df[strata_col], q=n_strata, labels=False, duplicates="drop")
+
+    cv = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=seed)
+    dz = df["datazone"].to_numpy()
+    for tr_idx, va_idx in cv.split(df, df["strata"], groups=df["intermediate_zone"]):
+        yield dz[tr_idx].tolist(), dz[va_idx].tolist()
