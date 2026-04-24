@@ -27,13 +27,14 @@ out_dir: outputs/decision/route_b/qwen3_llm_sft_v0
 #     adapter_path: outputs/decision/route_b/lora_adapter_v0
 # ------------------------------------------------------------------
 remote:
-  backend: openai_compat          # openai_compat | vllm_http | local_hf
+  backend: local_hf
+#  backend: openai_compat          # openai_compat | vllm_http | local_hf
   base_url: http://127.0.0.1:8000/v1
   model: models/Qwen3-8B            # for vLLM LoRA inference, set to the lora-module alias (e.g. sft)
   api_key_env: ROUTE_B_API_KEY    # optional; empty = no auth
   timeout_s: 120
   max_retries: 3
-  adapter_path: ""                # used only by local_hf backend; path to PEFT adapter dir
+  adapter_path: "outputs/decision/route_b/lora_adapter_v0"                # used only by local_hf backend; path to PEFT adapter dir
 
 # ------------------------------------------------------------------
 # Stage 1 — teacher CoT rationalisation
@@ -59,11 +60,11 @@ sft:
     target_modules: [q_proj, k_proj, v_proj, o_proj]
   train:
     epochs: 3
-    batch_size: 2
-    gradient_accumulation: 8
+    batch_size: 1
+    gradient_accumulation: 16
     lr: 1.0e-4
     warmup_ratio: 0.03
-    max_seq_len: 4096
+    max_seq_len: 2048
     seed: 42
   output_adapter_dir: outputs/decision/route_b/lora_adapter_v0
 
@@ -74,5 +75,5 @@ infer:
   adapter_dir: outputs/decision/route_b/lora_adapter_v0
   out_path: outputs/decision/route_b/predictions_v0.jsonl
   temperature: 0.0
-  max_tokens: 1024
+  max_tokens: 2048
   fallback: train_mean             # if JSON parse fails → per-domain train-set mean

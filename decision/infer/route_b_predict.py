@@ -73,6 +73,8 @@ def predict(cfg: dict, dataset_path: str | Path, out_path: str | Path | None = N
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     n_ok = n_fallback = 0
+    total = len(samples)
+    print(f"[predict] {total} samples → {out_path}", flush=True)
     with open(out_path, "w") as wf:
         for i, s in enumerate(samples):
             msgs = build_predict_messages(s)
@@ -84,7 +86,7 @@ def predict(cfg: dict, dataset_path: str | Path, out_path: str | Path | None = N
                 )
                 scores = _parse_scores(completion)
             except Exception as e:
-                print(f"[{i}] LLM error: {e}")
+                print(f"[{i+1}/{total}] LLM error: {e}", flush=True)
                 scores = None
 
             if scores is None:
@@ -93,14 +95,13 @@ def predict(cfg: dict, dataset_path: str | Path, out_path: str | Path | None = N
             else:
                 n_ok += 1
 
+            print(f"[{i+1}/{total}] {s['datazone']}  ok={n_ok} fallback={n_fallback}", flush=True)
+
             wf.write(json.dumps({
                 "datazone": s["datazone"],
                 "prediction_json": {d: float(round(scores[d], 4)) for d in DOMAINS},
                 "target_raw": {d: float(s["targets_raw"][d]) for d in DOMAINS},
             }) + "\n")
-
-            if (i + 1) % 50 == 0:
-                print(f"[{i+1}/{len(samples)}] ok={n_ok} fallback={n_fallback}")
 
     print(f"[done] {n_ok} parsed, {n_fallback} fell back → {out_path}")
     return out_path

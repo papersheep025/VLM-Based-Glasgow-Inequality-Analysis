@@ -30,7 +30,7 @@ def _load_jsonl(path: str | Path) -> list[dict]:
     return rows
 
 
-def run_sft(cfg: dict, sft_data_path: str | Path) -> None:
+def run_sft(cfg: dict, sft_data_path: str | Path, dry_run: int = 0) -> None:
     # Lazy imports — remote-host-only deps.
     import torch
     from datasets import Dataset
@@ -38,7 +38,7 @@ def run_sft(cfg: dict, sft_data_path: str | Path) -> None:
     from transformers import (
         AutoModelForCausalLM,
         AutoTokenizer,
-        DataCollatorForLanguageModeling,
+        DataCollatorForSeq2Seq,
         Trainer,
         TrainingArguments,
     )
@@ -57,16 +57,56 @@ def run_sft(cfg: dict, sft_data_path: str | Path) -> None:
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
 
+    max_len = tr["max_seq_len"]
+
     def render(example: dict) -> dict:
-        text = tok.apply_chat_template(example["messages"], tokenize=False, add_generation_prompt=False)
-        enc = tok(text, truncation=True, max_length=tr["max_seq_len"], padding=False)
-        enc["labels"] = enc["input_ids"].copy()
-        return enc
+        messages = example["messages"]
+        if not messages or messages[-1]["role"] != "assistant":
+            raise ValueError("expected last message role=assistant for SFT completion-only masking")
+        prompt_ids = tok.apply_chat_template(
+            messages[:-1], tokenize=True, add_generation_prompt=True
+        )
+        full_ids = tok.apply_chat_template(
+            messages, tokenize=True, add_generation_prompt=False
+        )
+        full_ids = full_ids[:max_len]
+        prompt_len = min(len(prompt_ids), len(full_ids))
+        labels = [-100] * prompt_len + list(full_ids[prompt_len:])
+        return {
+            "input_ids": full_ids,
+            "attention_mask": [1] * len(full_ids),
+            "labels": labels,
+        }
 
     ds = Dataset.from_list(rows).map(render, remove_columns=["messages", "datazone"])
 
+    if dry_run > 0:
+        n = min(dry_run, len(ds))
+        print(f"[sft][dry-run] inspecting first {n} rendered rows")
+        for i in range(n):
+            ex = ds[i]
+            ids = ex["input_ids"]
+            labels = ex["labels"]
+            masked = sum(1 for t in labels if t == -100)
+            kept = len(labels) - masked
+            try:
+                first_kept_idx = next(j for j, t in enumerate(labels) if t != -100)
+            except StopIteration:
+                first_kept_idx = -1
+            completion_ids = [t for t in labels if t != -100]
+            completion_text = tok.decode(completion_ids, skip_special_tokens=False)
+            gold_assistant = rows[i]["messages"][-1]["content"]
+            print(f"\n[row {i}] total={len(ids)}  masked={masked}  kept={kept}  prompt_len={first_kept_idx}")
+            print(f"  decoded kept segment (first 300 chars):\n    {completion_text[:300]!r}")
+            print(f"  gold assistant content (first 300 chars):\n    {gold_assistant[:300]!r}")
+            norm_kept = completion_text.replace(tok.eos_token or "", "").strip()
+            match = norm_kept.startswith(gold_assistant.strip()[:200])
+            print(f"  ✓ prefix match (first 200 chars of gold in decoded kept): {match}")
+        print("[sft][dry-run] done — skipping model load / training")
+        return
+
     model = AutoModelForCausalLM.from_pretrained(
-        base, torch_dtype=torch.bfloat16, device_map="auto",
+        base, torch_dtype=torch.bfloat16, device_map={"": 0},
     )
     lcfg = LoraConfig(
         r=lora["r"],
@@ -77,6 +117,7 @@ def run_sft(cfg: dict, sft_data_path: str | Path) -> None:
         task_type="CAUSAL_LM",
     )
     model = get_peft_model(model, lcfg)
+    model.enable_input_require_grads()
     model.print_trainable_parameters()
 
     args = TrainingArguments(
@@ -87,6 +128,7 @@ def run_sft(cfg: dict, sft_data_path: str | Path) -> None:
         learning_rate=tr["lr"],
         warmup_ratio=tr["warmup_ratio"],
         bf16=True,
+        gradient_checkpointing=True,
         logging_steps=10,
         save_strategy="epoch",
         save_total_limit=2,
@@ -97,8 +139,8 @@ def run_sft(cfg: dict, sft_data_path: str | Path) -> None:
         model=model,
         args=args,
         train_dataset=ds,
-        tokenizer=tok,
-        data_collator=DataCollatorForLanguageModeling(tok, mlm=False),
+        processing_class=tok,
+        data_collator=DataCollatorForSeq2Seq(tok, padding=True),
     )
     trainer.train()
     model.save_pretrained(out_dir)
@@ -110,9 +152,11 @@ def _main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--config", required=True)
     p.add_argument("--sft-data", required=True)
+    p.add_argument("--dry-run", type=int, default=0,
+                   help="If >0, render this many rows, print label-mask diagnostics, and exit without training.")
     args = p.parse_args()
     cfg = yaml.safe_load(open(args.config)) or {}
-    run_sft(cfg, args.sft_data)
+    run_sft(cfg, args.sft_data, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

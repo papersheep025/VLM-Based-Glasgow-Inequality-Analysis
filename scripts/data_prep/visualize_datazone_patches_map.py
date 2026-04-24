@@ -128,7 +128,7 @@ def main():
     parser.add_argument(
         "--tiff-max-px",
         type=int,
-        default=2048,
+        default=8192,
         help="Max pixel dimension when downsampling TIFFs",
     )
     args = parser.parse_args()
@@ -163,10 +163,10 @@ def main():
         has_sv = feature["properties"]["has_streetview"]
         has_p = feature["properties"]["has_patch"]
         if has_sv:
-            return {"fillColor": "#3388ff", "color": "#3388ff", "weight": 1.5, "fillOpacity": 0.2}
+            return {"fillColor": "#DE966395", "color": "#E2C314", "weight": 1.5, "fillOpacity": 0.2}
         elif has_p:
-            return {"fillColor": "#ff4444", "color": "#ff4444", "weight": 1.5, "fillOpacity": 0.2}
-        return {"fillColor": "#999999", "color": "#999999", "weight": 0.8, "fillOpacity": 0.1}
+            return {"fillColor": "#DE966395", "color": "#C9AF19", "weight": 1.5, "fillOpacity": 0.2}
+        return {"fillColor": "#DE966395", "color": "#C9AF19", "weight": 0.8, "fillOpacity": 0.1}
 
     folium.GeoJson(
         gdf[["DataZone", "Name", "has_patch", "has_streetview", "sv_count", "geometry"]].to_json(),
@@ -191,7 +191,7 @@ def main():
     sat_rect_group = folium.FeatureGroup(name="Satellite Patch Bounds", show=True)
     sat_center_group = folium.FeatureGroup(name="Satellite Patch Centers", show=True)
     for _, row in df.iterrows():
-        color = "#0066cc" if row["has_streetview"] else "#cc0000"
+        color = "#2068B6"
         folium.Rectangle(
             bounds=[
                 [row["bbox_min_lat"], row["bbox_min_lon"]],
@@ -224,7 +224,7 @@ def main():
         folium.CircleMarker(
             location=[sv_row["lat"], sv_row["lon"]],
             radius=1.5,
-            color="#ff8800",
+            color="#FF7B00",
             fill=True,
             fill_opacity=0.6,
             weight=0.5,

@@ -284,8 +284,9 @@ def main():
 
     domain_map = _detect_domain_map(simd_df)
 
-    rank_df = pd.read_csv(args.rank_csv, usecols=["datazone", "SIMD2020v2_Rank"])
-    simd_df = simd_df.merge(rank_df, on="datazone", how="left")
+    if "SIMD2020v2_Rank" not in simd_df.columns:
+        rank_df = pd.read_csv(args.rank_csv, usecols=["datazone", "SIMD2020v2_Rank"])
+        simd_df = simd_df.merge(rank_df, on="datazone", how="left")
     simd_df["rank_band"] = pd.qcut(
         simd_df["SIMD2020v2_Rank"], q=5, labels=[1, 2, 3, 4, 5]
     ).astype(int)

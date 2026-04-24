@@ -28,7 +28,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import seaborn as sns
 from scipy import stats
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # ── Style ─────────────────────────────────────────────────────────────────────
 FONT_FAMILY = "DejaVu Sans"
@@ -104,8 +104,9 @@ def load_merged(pred_csv: Path, simd_csv: Path, rank_csv: Path) -> pd.DataFrame:
     else:
         DOMAIN_MAP = DOMAIN_MAP_PRECISE
 
-    rank_df = pd.read_csv(rank_csv, usecols=["datazone", "SIMD2020v2_Rank"])
-    simd = simd.merge(rank_df, on="datazone", how="left")
+    if "SIMD2020v2_Rank" not in simd.columns:
+        rank_df = pd.read_csv(rank_csv, usecols=["datazone", "SIMD2020v2_Rank"])
+        simd = simd.merge(rank_df, on="datazone", how="left")
     simd["rank_band"] = pd.qcut(
         simd["SIMD2020v2_Rank"], q=5, labels=[1, 2, 3, 4, 5]
     ).astype(int)
@@ -456,6 +457,55 @@ def fig5_glasgow_map(df: pd.DataFrame, shapefile: Path, out: Path):
     print(f"  Saved {html_path}")
 
 
+# ── Figure 7: R² bar chart ────────────────────────────────────────────────────
+def fig7_r2_bar(df: pd.DataFrame, out: Path, no_pdf: bool):
+    domains = list(DOMAIN_MAP.keys())
+    r2_vals, r2_lo, r2_hi = [], [], []
+
+    rng = np.random.default_rng(42)
+    for domain in domains:
+        pred = df[domain].to_numpy(float)
+        true = df[DOMAIN_MAP[domain]].to_numpy(float)
+        mask = ~(np.isnan(pred) | np.isnan(true))
+        pred, true = pred[mask], true[mask]
+        r2_vals.append(r2_score(true, pred))
+
+        boots = []
+        for _ in range(500):
+            idx = rng.integers(0, len(pred), len(pred))
+            try:
+                boots.append(r2_score(true[idx], pred[idx]))
+            except Exception:
+                boots.append(float("nan"))
+        boots = np.array(boots, dtype=float)
+        r2_lo.append(float(np.nanpercentile(boots, 2.5)))
+        r2_hi.append(float(np.nanpercentile(boots, 97.5)))
+
+    order = np.argsort(r2_vals)
+    ordered_labels = [DOMAIN_LABELS[domains[i]] for i in order]
+    ordered_r2 = [r2_vals[i] for i in order]
+    ordered_xerr_lo = [ordered_r2[k] - r2_lo[order[k]] for k in range(len(order))]
+    ordered_xerr_hi = [r2_hi[order[k]] - ordered_r2[k] for k in range(len(order))]
+    colors = ["#5B9BD5" if v > 0 else "#E07B54" for v in ordered_r2]
+
+    x = np.arange(len(domains))
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.barh(
+        x, ordered_r2,
+        xerr=[ordered_xerr_lo, ordered_xerr_hi],
+        color=colors, capsize=3, error_kw={"elinewidth": 0.8},
+    )
+    ax.set_yticks(x)
+    ax.set_yticklabels(ordered_labels, fontsize=10)
+    ax.axvline(0, color="black", linewidth=0.8, linestyle="--", alpha=0.6)
+    ax.set_xlabel("R² (coefficient of determination)", fontsize=10)
+    ax.set_title("Per-Domain R² with 95% Bootstrap CI", fontsize=12, fontweight="bold")
+    for i, (v, lo, hi) in enumerate(zip(ordered_r2, ordered_xerr_lo, ordered_xerr_hi)):
+        ax.text(v + (hi if v >= 0 else -lo) + 0.01, i, f"{v:.3f}", va="center", fontsize=8)
+    fig.tight_layout()
+    save(fig, out / "fig7_r2_bar", no_pdf)
+
+
 # ── Figure 6: LISA cluster maps ─────────────────────────────────────────────
 def fig6_lisa_cluster_map(
     df: pd.DataFrame, shapefile: Path, out: Path, no_pdf: bool, p_threshold: float = 0.05
@@ -572,6 +622,9 @@ def main():
 
     print("[Fig 6] LISA cluster maps...")
     fig6_lisa_cluster_map(df, args.shapefile, args.output_dir, args.no_pdf)
+
+    print("[Fig 7] R² bar chart...")
+    fig7_r2_bar(df, args.output_dir, args.no_pdf)
 
     print(f"\nAll outputs written to {args.output_dir}/")
 
