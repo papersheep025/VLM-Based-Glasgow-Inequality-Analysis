@@ -1,0 +1,285 @@
+<svg width="1600" height="1800" viewBox="0 0 1600 1800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .bg{fill:#FAFBFD;}
+      .panel{fill:#FFFFFF;stroke:#1F2937;stroke-width:2.2;}
+      .soft{fill:#F8FAFC;stroke:#CBD5E1;stroke-width:1.5;}
+      .title{font-family:Inter, Arial, Helvetica, sans-serif;font-size:34px;font-weight:800;fill:#111827;}
+      .subtitle{font-family:Inter, Arial, Helvetica, sans-serif;font-size:20px;font-weight:500;fill:#475569;}
+      .step{font-family:Inter, Arial, Helvetica, sans-serif;font-size:28px;font-weight:800;fill:white;}
+      .h1{font-family:Inter, Arial, Helvetica, sans-serif;font-size:27px;font-weight:800;fill:#111827;}
+      .h2{font-family:Inter, Arial, Helvetica, sans-serif;font-size:21px;font-weight:800;fill:#111827;}
+      .txt{font-family:Inter, Arial, Helvetica, sans-serif;font-size:18px;font-weight:500;fill:#1F2937;}
+      .small{font-family:Inter, Arial, Helvetica, sans-serif;font-size:15px;font-weight:500;fill:#475569;}
+      .tiny{font-family:Inter, Arial, Helvetica, sans-serif;font-size:13px;font-weight:600;fill:#64748B;}
+      .mono{font-family:SFMono-Regular, Consolas, Monaco, monospace;font-size:16px;font-weight:600;fill:#334155;}
+      .arrow{stroke:#334155;stroke-width:3;marker-end:url(#arrow);}
+      .thinArrow{stroke:#64748B;stroke-width:2;marker-end:url(#arrowSmall);}
+      .dash{stroke:#94A3B8;stroke-width:2;stroke-dasharray:8 8;}
+      .sat{fill:#E2EFD9;stroke:#2E7D32;}
+      .ntl{fill:#DFEBF7;stroke:#2563EB;}
+      .sv{fill:#FCE5D6;stroke:#C2410C;}
+      .poi{fill:#EDEEF7;stroke:#6D28D9;}
+      .target{fill:#FFF2CC;stroke:#D97706;}
+      .pink{fill:#FDE2E2;stroke:#DC2626;}
+      .greenText{fill:#15803D;font-weight:800;}
+      .blueText{fill:#1D4ED8;font-weight:800;}
+      .orangeText{fill:#C2410C;font-weight:800;}
+      .purpleText{fill:#6D28D9;font-weight:800;}
+      .goldText{fill:#B45309;font-weight:800;}
+      .shadow{filter:url(#shadow);}
+    </style>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M1,1 L11,6 L1,11 Z" fill="#334155"/>
+    </marker>
+    <marker id="arrowSmall" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M1,1 L9,5 L1,9 Z" fill="#64748B"/>
+    </marker>
+    <linearGradient id="embedGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#E2EFD9"/>
+      <stop offset="0.33" stop-color="#DFEBF7"/>
+      <stop offset="0.66" stop-color="#FCE5D6"/>
+      <stop offset="1" stop-color="#EDEEF7"/>
+    </linearGradient>
+  </defs>
+
+  <rect class="bg" width="1600" height="1800"/>
+
+  <!-- Header -->
+  <text x="800" y="68" text-anchor="middle" class="title">Decision Layer: Leakage-safe Multimodal Regression Pipeline</text>
+  <text x="800" y="105" text-anchor="middle" class="subtitle">Perception JSONL → Modality-aware SBERT Encoding → Datazone Aggregation → Spatial/SAR Features → RidgeCV × 7 SIMD Domains</text>
+
+  <!-- Input file icon -->
+  <g class="shadow">
+    <rect x="660" y="138" width="280" height="62" rx="18" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
+    <path d="M704 153h34l16 16v33h-50z" fill="#F8FAFC" stroke="#475569" stroke-width="2"/>
+    <path d="M738 153v16h16" stroke="#475569" stroke-width="2"/>
+    <text x="774" y="177" class="h2">perception JSONL</text>
+    <text x="774" y="194" class="tiny">VLM textual evidence</text>
+  </g>
+  <line x1="800" y1="200" x2="800" y2="238" class="arrow"/>
+
+  <!-- Stage 1 -->
+  <g class="shadow">
+    <rect x="60" y="240" width="1480" height="190" rx="24" class="panel"/>
+    <rect x="85" y="265" width="48" height="48" rx="12" fill="#2563EB"/>
+    <text x="109" y="298" text-anchor="middle" class="step">1</text>
+    <text x="155" y="296" class="h1">dataset_v0.jsonl</text>
+    <text x="155" y="329" class="txt">4 textual fields + supervised SIMD targets</text>
+    <text x="155" y="358" class="small">sat / ntl / sv / poi_text are kept separated before encoding</text>
+
+    <g transform="translate(560,270)">
+      <rect width="148" height="120" rx="16" class="sat"/>
+      <text x="74" y="32" text-anchor="middle" class="h2 greenText">SAT</text>
+      <circle cx="48" cy="68" r="10" fill="#2E7D32" opacity="0.85"/><circle cx="78" cy="55" r="10" fill="#2E7D32" opacity="0.75"/><circle cx="98" cy="82" r="10" fill="#2E7D32" opacity="0.65"/>
+      <path d="M55 66L75 57L92 78" stroke="#2E7D32" stroke-width="3"/>
+      <text x="74" y="105" text-anchor="middle" class="small">~30 tokens</text>
+    </g>
+    <g transform="translate(730,270)">
+      <rect width="148" height="120" rx="16" class="ntl"/>
+      <text x="74" y="32" text-anchor="middle" class="h2 blueText">NTL</text>
+      <rect x="48" y="52" width="52" height="46" rx="6" fill="#2563EB" opacity="0.86"/>
+      <path d="M60 66h28M60 78h28M60 90h18" stroke="#EFF6FF" stroke-width="4" stroke-linecap="round"/>
+      <text x="74" y="105" text-anchor="middle" class="small">~30 tokens</text>
+    </g>
+    <g transform="translate(900,270)">
+      <rect width="148" height="120" rx="16" class="sv"/>
+      <text x="74" y="32" text-anchor="middle" class="h2 orangeText">SV</text>
+      <ellipse cx="74" cy="66" rx="36" ry="22" fill="#C2410C" opacity="0.85"/>
+      <circle cx="61" cy="66" r="4" fill="#FFF7ED"/><circle cx="74" cy="66" r="4" fill="#FFF7ED"/><circle cx="87" cy="66" r="4" fill="#FFF7ED"/>
+      <text x="74" y="105" text-anchor="middle" class="small">phrases ≤ 8 words</text>
+    </g>
+    <g transform="translate(1070,270)">
+      <rect width="148" height="120" rx="16" class="poi"/>
+      <text x="74" y="32" text-anchor="middle" class="h2 purpleText">POI</text>
+      <path d="M74 94s30-34 30-58a30 30 0 1 0-60 0c0 24 30 58 30 58z" fill="#6D28D9" opacity="0.84"/>
+      <circle cx="74" cy="37" r="10" fill="#F5F3FF"/>
+      <text x="74" y="110" text-anchor="middle" class="small">~15 tokens</text>
+    </g>
+    <g transform="translate(1240,270)">
+      <rect width="148" height="120" rx="16" class="target"/>
+      <text x="74" y="32" text-anchor="middle" class="h2 goldText">SIMD</text>
+      <rect x="45" y="82" width="12" height="18" fill="#D97706" opacity="0.85"/><rect x="66" y="66" width="12" height="34" fill="#D97706" opacity="0.75"/><rect x="87" y="48" width="12" height="52" fill="#D97706" opacity="0.65"/>
+      <text x="74" y="110" text-anchor="middle" class="small">7 targets</text>
+    </g>
+  </g>
+  <line x1="800" y1="430" x2="800" y2="468" class="arrow"/>
+
+  <!-- Stage 2 -->
+  <g class="shadow">
+    <rect x="60" y="470" width="1480" height="360" rx="24" class="panel"/>
+    <rect x="85" y="495" width="48" height="48" rx="12" fill="#2563EB"/>
+    <text x="109" y="528" text-anchor="middle" class="step">2</text>
+    <text x="155" y="526" class="h1">Modality-aware SBERT Encoding</text>
+    <text x="155" y="559" class="txt">4 × 384-dim embeddings are concatenated into a 1536-dim representation</text>
+
+    <!-- four lanes -->
+    <g transform="translate(125,610)">
+      <rect width="300" height="160" rx="18" class="sat"/>
+      <text x="150" y="33" text-anchor="middle" class="h2 greenText">SAT: full-text encode</text>
+      <rect x="42" y="58" width="216" height="38" rx="10" fill="#FFFFFF" stroke="#2E7D32"/>
+      <text x="150" y="82" text-anchor="middle" class="small">SBERT sentence encoder</text>
+      <line x1="150" y1="100" x2="150" y2="122" class="thinArrow"/>
+      <g transform="translate(60,130)">
+        <rect width="180" height="16" fill="#DCFCE7" stroke="#2E7D32"/>
+        <g stroke="#2E7D32" opacity="0.75"><line x1="18" y1="0" x2="18" y2="16"/><line x1="36" y1="0" x2="36" y2="16"/><line x1="54" y1="0" x2="54" y2="16"/><line x1="72" y1="0" x2="72" y2="16"/><line x1="90" y1="0" x2="90" y2="16"/><line x1="108" y1="0" x2="108" y2="16"/><line x1="126" y1="0" x2="126" y2="16"/><line x1="144" y1="0" x2="144" y2="16"/><line x1="162" y1="0" x2="162" y2="16"/></g>
+      </g>
+      <text x="150" y="157" text-anchor="middle" class="tiny">384-d</text>
+    </g>
+    <g transform="translate(475,610)">
+      <rect width="300" height="160" rx="18" class="ntl"/>
+      <text x="150" y="33" text-anchor="middle" class="h2 blueText">NTL: full-text encode</text>
+      <rect x="42" y="58" width="216" height="38" rx="10" fill="#FFFFFF" stroke="#2563EB"/>
+      <text x="150" y="82" text-anchor="middle" class="small">SBERT sentence encoder</text>
+      <line x1="150" y1="100" x2="150" y2="122" class="thinArrow"/>
+      <g transform="translate(60,130)"><rect width="180" height="16" fill="#DBEAFE" stroke="#2563EB"/><g stroke="#2563EB" opacity="0.75"><line x1="18" y1="0" x2="18" y2="16"/><line x1="36" y1="0" x2="36" y2="16"/><line x1="54" y1="0" x2="54" y2="16"/><line x1="72" y1="0" x2="72" y2="16"/><line x1="90" y1="0" x2="90" y2="16"/><line x1="108" y1="0" x2="108" y2="16"/><line x1="126" y1="0" x2="126" y2="16"/><line x1="144" y1="0" x2="144" y2="16"/><line x1="162" y1="0" x2="162" y2="16"/></g></g>
+      <text x="150" y="157" text-anchor="middle" class="tiny">384-d</text>
+    </g>
+    <g transform="translate(825,610)">
+      <rect width="300" height="160" rx="18" class="sv"/>
+      <text x="150" y="33" text-anchor="middle" class="h2 orangeText">SV: phrase encode</text>
+      <rect x="40" y="54" width="220" height="28" rx="8" fill="#FFFFFF" stroke="#C2410C"/>
+      <text x="150" y="74" text-anchor="middle" class="small">per-phrase SBERT</text>
+      <rect x="62" y="92" width="176" height="22" rx="6" fill="#FFF7ED" stroke="#C2410C" stroke-dasharray="5 5"/>
+      <text x="150" y="109" text-anchor="middle" class="tiny">mean-pool phrase vectors</text>
+      <line x1="150" y1="116" x2="150" y2="128" class="thinArrow"/>
+      <g transform="translate(60,136)"><rect width="180" height="16" fill="#FFEDD5" stroke="#C2410C"/><g stroke="#C2410C" opacity="0.75"><line x1="18" y1="0" x2="18" y2="16"/><line x1="36" y1="0" x2="36" y2="16"/><line x1="54" y1="0" x2="54" y2="16"/><line x1="72" y1="0" x2="72" y2="16"/><line x1="90" y1="0" x2="90" y2="16"/><line x1="108" y1="0" x2="108" y2="16"/><line x1="126" y1="0" x2="126" y2="16"/><line x1="144" y1="0" x2="144" y2="16"/><line x1="162" y1="0" x2="162" y2="16"/></g></g>
+      <text x="150" y="157" text-anchor="middle" class="tiny">384-d</text>
+    </g>
+    <g transform="translate(1175,610)">
+      <rect width="300" height="160" rx="18" class="poi"/>
+      <text x="150" y="33" text-anchor="middle" class="h2 purpleText">POI: full-text encode</text>
+      <rect x="42" y="58" width="216" height="38" rx="10" fill="#FFFFFF" stroke="#6D28D9"/>
+      <text x="150" y="82" text-anchor="middle" class="small">SBERT sentence encoder</text>
+      <line x1="150" y1="100" x2="150" y2="122" class="thinArrow"/>
+      <g transform="translate(60,130)"><rect width="180" height="16" fill="#EDE9FE" stroke="#6D28D9"/><g stroke="#6D28D9" opacity="0.75"><line x1="18" y1="0" x2="18" y2="16"/><line x1="36" y1="0" x2="36" y2="16"/><line x1="54" y1="0" x2="54" y2="16"/><line x1="72" y1="0" x2="72" y2="16"/><line x1="90" y1="0" x2="90" y2="16"/><line x1="108" y1="0" x2="108" y2="16"/><line x1="126" y1="0" x2="126" y2="16"/><line x1="144" y1="0" x2="144" y2="16"/><line x1="162" y1="0" x2="162" y2="16"/></g></g>
+      <text x="150" y="157" text-anchor="middle" class="tiny">384-d</text>
+    </g>
+
+    <line x1="275" y1="772" x2="800" y2="790" class="thinArrow"/>
+    <line x1="625" y1="772" x2="800" y2="790" class="thinArrow"/>
+    <line x1="975" y1="772" x2="800" y2="790" class="thinArrow"/>
+    <line x1="1325" y1="772" x2="800" y2="790" class="thinArrow"/>
+    <rect x="520" y="782" width="560" height="26" rx="8" fill="url(#embedGrad)" stroke="#6D28D9" stroke-width="1.5"/>
+    <g stroke="#7C3AED" opacity="0.55">
+      <line x1="548" y1="782" x2="548" y2="808"/><line x1="576" y1="782" x2="576" y2="808"/><line x1="604" y1="782" x2="604" y2="808"/><line x1="632" y1="782" x2="632" y2="808"/><line x1="660" y1="782" x2="660" y2="808"/><line x1="688" y1="782" x2="688" y2="808"/><line x1="716" y1="782" x2="716" y2="808"/><line x1="744" y1="782" x2="744" y2="808"/><line x1="772" y1="782" x2="772" y2="808"/><line x1="800" y1="782" x2="800" y2="808"/><line x1="828" y1="782" x2="828" y2="808"/><line x1="856" y1="782" x2="856" y2="808"/><line x1="884" y1="782" x2="884" y2="808"/><line x1="912" y1="782" x2="912" y2="808"/><line x1="940" y1="782" x2="940" y2="808"/><line x1="968" y1="782" x2="968" y2="808"/><line x1="996" y1="782" x2="996" y2="808"/><line x1="1024" y1="782" x2="1024" y2="808"/><line x1="1052" y1="782" x2="1052" y2="808"/>
+    </g>
+    <text x="1100" y="801" class="mono">1536-d</text>
+  </g>
+  <line x1="800" y1="830" x2="800" y2="868" class="arrow"/>
+
+  <!-- Stage 3 -->
+  <g class="shadow">
+    <rect x="60" y="870" width="1480" height="220" rx="24" class="panel"/>
+    <rect x="85" y="895" width="48" height="48" rx="12" fill="#2563EB"/>
+    <text x="109" y="928" text-anchor="middle" class="step">3</text>
+    <text x="155" y="926" class="h1">Datazone-level Aggregation <tspan class="mono">(dz_agg)</tspan></text>
+    <text x="155" y="959" class="txt">Multiple image-level embeddings → one unique embedding per DZ</text>
+    <text x="155" y="990" class="small">mean-pool fixes duplicated-DZ bug and aligns samples with zone-level SIMD labels</text>
+
+    <g transform="translate(620,915)">
+      <rect x="0" y="0" width="230" height="125" rx="18" fill="#F8FAFC" stroke="#CBD5E1"/>
+      <text x="115" y="28" text-anchor="middle" class="h2">image embeddings</text>
+      <rect x="40" y="48" width="150" height="16" fill="url(#embedGrad)" stroke="#7C3AED"/><rect x="40" y="74" width="150" height="16" fill="url(#embedGrad)" stroke="#7C3AED" opacity="0.78"/><rect x="40" y="100" width="150" height="16" fill="url(#embedGrad)" stroke="#7C3AED" opacity="0.55"/>
+    </g>
+    <line x1="870" y1="978" x2="980" y2="978" class="thinArrow"/>
+    <g transform="translate(1000,915)">
+      <rect x="0" y="0" width="230" height="125" rx="18" fill="#ECFEFF" stroke="#0891B2"/>
+      <text x="115" y="28" text-anchor="middle" class="h2">mean-pool by DZ</text>
+      <path d="M60 58h110M75 78h80M90 98h50" stroke="#0891B2" stroke-width="8" stroke-linecap="round" opacity="0.75"/>
+      <text x="115" y="116" text-anchor="middle" class="tiny">one 1536-d vector / DZ</text>
+    </g>
+  </g>
+  <line x1="800" y1="1090" x2="800" y2="1128" class="arrow"/>
+
+  <!-- Stage 4 -->
+  <g class="shadow">
+    <rect x="60" y="1130" width="1480" height="330" rx="24" class="panel"/>
+    <rect x="85" y="1155" width="48" height="48" rx="12" fill="#2563EB"/>
+    <text x="109" y="1188" text-anchor="middle" class="step">4</text>
+    <text x="155" y="1186" class="h1">Spatial Feature Concatenation <tspan class="mono">(per fold)</tspan></text>
+    <text x="155" y="1219" class="txt">All transformations using labels or fitted statistics are fold-local to prevent validation leakage</text>
+
+    <g transform="translate(115,1260)">
+      <rect width="470" height="48" rx="12" class="sat"/>
+      <text x="22" y="31" class="txt greenText">Spatial lag</text>
+      <text x="158" y="31" class="small">concat([self, neighbor_mean])</text>
+      <text x="398" y="31" class="mono greenText">3072-d</text>
+      <rect y="63" width="470" height="48" rx="12" class="ntl"/>
+      <text x="22" y="94" class="txt blueText">Ego-gap</text>
+      <text x="158" y="94" class="small">concat([self, self − neighbor_mean])</text>
+      <text x="398" y="94" class="mono blueText">3072-d</text>
+      <rect y="126" width="470" height="48" rx="12" class="target"/>
+      <text x="22" y="157" class="txt goldText">POI numeric</text>
+      <text x="158" y="157" class="small">PoiFitter fitted only on train fold</text>
+      <text x="420" y="157" class="mono goldText">p-d</text>
+    </g>
+    <g transform="translate(630,1260)">
+      <rect width="360" height="174" rx="18" fill="#F8FAFC" stroke="#CBD5E1"/>
+      <text x="180" y="28" text-anchor="middle" class="h2">Queen adjacency graph</text>
+      <circle cx="85" cy="80" r="15" fill="#E2EFD9" stroke="#15803D" stroke-width="3"/>
+      <circle cx="150" cy="52" r="15" fill="#DFEBF7" stroke="#2563EB" stroke-width="3"/>
+      <circle cx="235" cy="78" r="15" fill="#FCE5D6" stroke="#C2410C" stroke-width="3"/>
+      <circle cx="134" cy="126" r="15" fill="#EDEEF7" stroke="#6D28D9" stroke-width="3"/>
+      <circle cx="252" cy="132" r="15" fill="#FFF2CC" stroke="#D97706" stroke-width="3"/>
+      <path d="M99 74L136 58M98 89L122 115M165 57L221 73M240 93L247 117M148 125L237 132" stroke="#64748B" stroke-width="3"/>
+      <text x="180" y="160" text-anchor="middle" class="tiny">neighbor_mean and train-neighbor target lag</text>
+    </g>
+    <g transform="translate(1035,1260)">
+      <rect width="420" height="174" rx="18" fill="#FFFFFF" stroke="#CBD5E1"/>
+      <text x="210" y="28" text-anchor="middle" class="h2">final feature vector</text>
+      <rect x="44" y="58" width="82" height="34" fill="#DCFCE7" stroke="#15803D"/><rect x="126" y="58" width="82" height="34" fill="#DBEAFE" stroke="#2563EB"/><rect x="208" y="58" width="82" height="34" fill="#FEF3C7" stroke="#D97706"/><rect x="290" y="58" width="82" height="34" fill="#EDE9FE" stroke="#6D28D9"/>
+      <text x="85" y="81" text-anchor="middle" class="tiny">self</text><text x="167" y="81" text-anchor="middle" class="tiny">gap</text><text x="249" y="81" text-anchor="middle" class="tiny">POI</text><text x="331" y="81" text-anchor="middle" class="tiny">SAR</text>
+      <text x="210" y="130" text-anchor="middle" class="mono">dim = 6144 + p + 7</text>
+      <text x="210" y="155" text-anchor="middle" class="tiny">SAR = mean(y_train_neighbors), no val labels</text>
+    </g>
+  </g>
+  <line x1="800" y1="1460" x2="800" y2="1498" class="arrow"/>
+
+  <!-- Stage 5 -->
+  <g class="shadow">
+    <rect x="60" y="1500" width="1480" height="190" rx="24" class="panel"/>
+    <rect x="85" y="1525" width="48" height="48" rx="12" fill="#2563EB"/>
+    <text x="109" y="1558" text-anchor="middle" class="step">5</text>
+    <text x="155" y="1556" class="h1">RidgeCV × 7 SIMD Domains</text>
+    <text x="155" y="1588" class="txt">StandardScaler → clip(±30) → RidgeCV(cv=5, 25 alphas)</text>
+
+    <g transform="translate(160,1620)">
+      <rect width="190" height="46" rx="12" fill="#F8FAFC" stroke="#CBD5E1"/>
+      <text x="95" y="29" text-anchor="middle" class="small">StandardScaler</text>
+      <line x1="205" y1="23" x2="250" y2="23" class="thinArrow"/>
+      <rect x="265" width="140" height="46" rx="12" fill="#F8FAFC" stroke="#CBD5E1"/>
+      <text x="335" y="29" text-anchor="middle" class="small">clip ±30</text>
+      <line x1="420" y1="23" x2="465" y2="23" class="thinArrow"/>
+    </g>
+
+    <g transform="translate(650,1608)">
+      <rect x="0" y="0" width="110" height="58" rx="12" class="pink"/><text x="55" y="35" text-anchor="middle" class="tiny">Income</text>
+      <rect x="120" y="0" width="110" height="58" rx="12" class="pink"/><text x="175" y="35" text-anchor="middle" class="tiny">Employment</text>
+      <rect x="240" y="0" width="110" height="58" rx="12" class="pink"/><text x="295" y="35" text-anchor="middle" class="tiny">Health</text>
+      <rect x="360" y="0" width="110" height="58" rx="12" class="pink"/><text x="415" y="35" text-anchor="middle" class="tiny">Education</text>
+      <rect x="480" y="0" width="110" height="58" rx="12" class="pink"/><text x="535" y="35" text-anchor="middle" class="tiny">Access</text>
+      <rect x="600" y="0" width="110" height="58" rx="12" class="pink"/><text x="655" y="35" text-anchor="middle" class="tiny">Crime</text>
+      <rect x="720" y="0" width="110" height="58" rx="12" class="pink"/><text x="775" y="35" text-anchor="middle" class="tiny">Housing</text>
+    </g>
+  </g>
+  <line x1="800" y1="1690" x2="800" y2="1728" class="arrow"/>
+
+  <!-- Output -->
+  <g class="shadow">
+    <rect x="430" y="1730" width="740" height="58" rx="20" fill="#FFFFFF" stroke="#1F2937" stroke-width="2"/>
+    <text x="800" y="1766" text-anchor="middle" class="h2">OOF predictions  +  cv_summary.json</text>
+  </g>
+
+  <!-- Footer legend -->
+  <g transform="translate(80,1712)">
+    <text x="0" y="0" class="tiny">Color code:</text>
+    <rect x="82" y="-12" width="18" height="12" class="sat"/><text x="108" y="0" class="tiny">satellite</text>
+    <rect x="174" y="-12" width="18" height="12" class="ntl"/><text x="200" y="0" class="tiny">nightlight</text>
+    <rect x="290" y="-12" width="18" height="12" class="sv"/><text x="316" y="0" class="tiny">street-view</text>
+    <rect x="405" y="-12" width="18" height="12" class="poi"/><text x="431" y="0" class="tiny">POI</text>
+  </g>
+</svg>

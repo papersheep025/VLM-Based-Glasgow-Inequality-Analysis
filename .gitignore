@@ -12,3 +12,6 @@ outputs/
 *.pyc
 .vscode
 .claude
+legacy/
+paper_outline_v1.md
+paper/

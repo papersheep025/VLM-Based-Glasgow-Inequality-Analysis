@@ -1,0 +1,39 @@
+# Route C v1 baseline features, but regressor swapped from RidgeCV → LightGBM.
+# No indicators yet (use_domain_indicators=false) — this is the apples-to-apples
+# comparison vs route_c_modality_sep_v1.yaml so we can isolate the model effect.
+
+dataset: outputs/decision/dataset_v1.jsonl
+out_dir: outputs/decision/route_c/modality_sep_v1_lgbm
+
+caption:
+  mode: modality_sep
+
+encoder:
+  backend: sbert
+  name: sentence-transformers/all-MiniLM-L6-v2
+  batch_size: 32
+  max_length: 256
+
+cv:
+  n_splits: 5
+
+train:
+  use_poi_vec: true
+  use_spatial_lag: true
+  use_ego_gap: true
+  use_sar_lag: true
+  use_dz_agg: true
+  use_domain_indicators: false
+  seed: 42
+
+lgbm:
+  backend: hgb            # use sklearn HistGradientBoostingRegressor (no libomp dep)
+  n_estimators: 2000
+  learning_rate: 0.03
+  num_leaves: 31
+  min_data_in_leaf: 20
+  feature_fraction: 0.8
+  bagging_fraction: 0.8
+  bagging_freq: 5
+  lambda_l2: 1.0
+  early_stopping_rounds: 100

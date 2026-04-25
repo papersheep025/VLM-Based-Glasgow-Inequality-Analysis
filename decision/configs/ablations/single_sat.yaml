@@ -1,0 +1,25 @@
+# Single-modality: keep only SAT, zero out NTL/SV/POI
+dataset: outputs/decision/dataset_v1.jsonl
+out_dir: outputs/decision/route_c/ablations/single_sat
+
+caption:
+  mode: modality_sep
+
+encoder:
+  backend: sbert
+  name: sentence-transformers/all-MiniLM-L6-v2
+  batch_size: 32
+  max_length: 256
+
+cv:
+  n_splits: 5
+
+train:
+  regressor: ridge_cv
+  use_poi_vec: true
+  use_spatial_lag: true
+  use_ego_gap: true
+  use_sar_lag: true
+  use_dz_agg: true
+  keep_modalities: [sat]
+  seed: 42

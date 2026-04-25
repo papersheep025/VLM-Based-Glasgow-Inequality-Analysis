@@ -5,7 +5,7 @@ Columns: patch_id, total, amenity, craft, emergency, healthcare, historic,
          leisure, office, public_transport, railway, shop, sport, tourism
 
 Usage:
-    python scripts/data_prep/build_patch_poi.py
+    python -m perception.data.build_patch_poi
 """
 from __future__ import annotations
 

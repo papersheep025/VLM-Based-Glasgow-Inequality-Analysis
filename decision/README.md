@@ -7,17 +7,21 @@
 
 ## 路线总览
 
-| 路线 | 方法 | OOF pooled ρ | OOF pooled R² | 状态 |
+| 路线 | 方法 | OOF ρ | OOF R² | 状态 |
 |---|---|---|---|---|
-| **Route C modality_sep_v0** | 分模态 SBERT + 空间滞后 + ego-gap + SAR lag + POI | **0.667** | **0.463** | 当前最优 |
-| Route C ceiling_v0 | 单向量 SBERT + 空间滞后 + ego-gap + SAR lag + POI | 0.511 | 0.434 | 已复现 |
-| Route C sbert_spatial_poi_v0 | 单向量 SBERT + 空间滞后 + POI | 0.507 | 0.448 | 已复现 |
-| Route C sbert_minilm_v0 | 单向量 SBERT（concat 拼接，无空间/POI/ego/SAR） | 0.443 | 0.277 | 已复现（消融基线） |
-| Route A'（LightGBM） | 冻结 BGE-m3 + PCA + POI → 7×LGBM | 0.438 | 0.195 | 已复现 |
-| Route A（MLP） | 冻结 BGE-m3 + attention pooling → 共享 trunk + 7 头 | fold-mean 0.517 / pooled 0.275 | -0.143 | 有 fold 偏差 |
-| Route B（对照） | Qwen3-8B CoT rationale + LoRA SFT | 0.123 | 0.083 | 需远程 GPU |
+| **Route C + SegFormer SVF** | v1 + SegFormer SVF mean/std | **0.6682** | **0.4644** | 当前最优 |
+| Route C + MIT PSP SVF | v1 + MIT PSP SVF | 0.6676 | 0.4636 | 同等水平 |
+| Route C + both SVF | v1 + 两组 SVF mean/std | 0.6665 | 0.4627 | 同等水平 |
+| Route C modality_sep_v1 + indicators | v1 + 17 个 VLM domain indicators | 0.6660 | 0.4605 | 零增益消融 |
+| **Route C modality_sep_v1** | 分模态 SBERT + 空间滞后 + ego-gap + SAR lag + POI，RidgeCV | 0.6655 | 0.4600 | 强基线 |
+| Route C stacking_v1 | SBERT→Ridge OOF + 结构化 POI/indicator/SVF→HGB，二层 Ridge 融合 | 0.6524 | 0.3558 | 退化于 baseline |
+| Route C HGB | v1 原始高维特征 → HGB | 0.6319 | 0.2546 | 小样本高维下退化 |
+| Route C HGB+PCA+indicators | PCA 降维 SBERT + indicators → HGB | 0.5905 | 0.1839 | 明显退化 |
+| indicators-only | 仅 17 个 domain indicators → RidgeCV | 0.5099 | 0.2866 | 可解释但非新增信息源 |
 
-> **说明**：Route A 的 fold-mean 与 pooled OOF 偏差来自 fold 内漂移（各折校准不一致）。Route C 系列 fold-mean ≈ pooled ρ，评估最可靠。
+> **评估口径**：所有 OOF ρ / R² 均按 **stacked + datazone-aggregated** 计算——先把同一 datazone 的多张图 OOF 预测取均值（n_dz = 746），再把 7 个域的 (target, pred) 全部 concat 成一条长向量，计算总 Spearman / R²。该口径与历史 `evaluate_domain_scores.py` 的 `overall` 行一致，是论文唯一对外口径。
+> Route A 的 fold-mean 与 OOF 指标的偏差来自 fold 内漂移（各折校准不一致）；Route C 系列 fold-mean ≈ OOF 指标，评估最可靠。
+> SVF 系列在 ρ / R² 上均略优于 baseline，但增益在 0.005 量级，属噪声。stacking_v1 在该口径下 R² 与 ρ 双双低于 baseline，说明二层融合损失了校准信息，**不再作为论文最优方案**。
 
 ---
 
@@ -27,6 +31,8 @@
 decision/
   configs/
     route_c_modality_sep_v0.yaml   # 主线实验配置
+    diagnostics/                   # SAR / spatial / text-only 诊断配置
+    svf/                           # SegFormer / MIT PSP SVF 消融配置
     route_c_ceiling_v0.yaml        # 单向量版上限配置（对比基准）
     route_c_caption_embed.yaml     # Route C 基础配置（消融用）
     route_a_bge.yaml               # Route A MLP
@@ -50,15 +56,129 @@ decision/
   train/
     route_c_train.py               # Route C 单 fold 训练（7 域独立 RidgeCV）
     cv_runner_caption.py           # Route C 5-fold IZ CV 驱动，支持 modality_sep
+    cv_runner_svf.py               # Route C + SVF 特征块
+    cv_runner_caption_lgbm.py      # Route C + HGB / PCA-HGB 实验
     cv_runner.py                   # Route A CV 驱动
     cv_runner_lgbm.py              # Route A' CV 驱动
+  experiments/
+    manifests/
+      paper_v1.yaml                # 论文主表：baseline / indicators / SVF / HGB / stacking
+      diagnostics_v1.yaml          # 诊断矩阵：SAR-only / no-SAR / residual / text-only
+    run_manifest.py                # 按 manifest 复现实验或重建比较表
   infer/
     route_b_predict.py             # Route B 推理
   eval/
+    oof.py                         # 标准 OOF 读取、聚合、Spearman 计算
+    compare.py                     # 任意 OOF run 的统一对比 CLI
     hypothesis_test.py             # 路线间 Wilcoxon + bootstrap Spearman CI
 ```
 
 输出写入 `outputs/decision/route_c/<实验名>/`。
+
+---
+
+## 可诊断、可消融、可复现的实验框架
+
+当前实验统一围绕 **OOF prediction** 组织：每个 run 必须输出同一套文件，至少包括：
+
+```
+outputs/decision/route_c/<run_name>/
+  oof_predictions.jsonl
+  cv_summary.json
+```
+
+论文主表统一使用 **stacked + datazone-aggregated** 口径：先按 datazone 对重复 OOF 行做均值聚合（n_dz = 746），再把 7 个域的 (target, pred) 全部 concat 成一条长向量，计算单一 Spearman / R²。这是项目唯一对外口径，`decision.eval.compare` 与 `decision/eval/oof.py` 已锁死该实现，无需配置项。
+
+可选诊断文件：
+
+```
+feature_slices.json        # 特征块列范围，用于系数/消融诊断
+fold*/fold_meta.json       # fold 级指标
+fold*/reg_<domain>.joblib  # RidgeCV pipeline
+```
+
+### 论文主表复现
+
+`decision/experiments/manifests/paper_v1.yaml` 固定了当前论文主表顺序：
+
+```bash
+python -m decision.eval.compare \
+  --manifest decision/experiments/manifests/paper_v1.yaml
+```
+
+如需重跑某个实验：
+
+```bash
+python -m decision.experiments.run_manifest \
+  --manifest decision/experiments/manifests/paper_v1.yaml \
+  --only stacking_v1
+```
+
+只重建比较表：
+
+```bash
+python -m decision.experiments.run_manifest \
+  --manifest decision/experiments/manifests/paper_v1.yaml \
+  --only compare
+```
+
+比较结果默认写入：
+
+```
+outputs/evaluation/paper_v1_route_c_comparison.csv
+```
+
+### 诊断矩阵
+
+`decision/experiments/manifests/diagnostics_v1.yaml` 用于拆分信号来源：
+
+| run | 目的 |
+|---|---|
+| `full_v1` | 当前 RidgeCV 强基线 |
+| `sar_only_v1` | 仅使用 train-neighbour SIMD 均值，估计纯空间目标滞后强度 |
+| `no_sar_v1` | 去掉 SAR target lag，估计非目标空间插值贡献 |
+| `residual_after_sar_v1` | 先拟合 SAR，再用非 SAR Route C 特征预测剩余残差 |
+| `no_spatial_no_sar_v1` | 去掉 spatial lag / ego-gap / SAR，保留 SBERT+POI |
+| `text_only_v1` | 仅保留 modality-separated SBERT |
+| `indicators_only_v2` | 仅保留 17 个 VLM domain indicators |
+| `stacking_v1` | 当前最优融合方案 |
+
+当前诊断结果（stacked + datazone-aggregated）：
+
+| run | ρ | R² | Δρ vs full_v1 |
+|---|---:|---:|---:|
+| `full_v1` | 0.6655 | 0.4600 | 0.0000 |
+| `sar_only_v1` | 0.5528 | 0.3156 | -0.1127 |
+| `no_sar_v1` | 0.6403 | 0.4319 | -0.0251 |
+| `residual_after_sar_v1` | 0.5970 | 0.3613 | -0.0684 |
+| `no_spatial_no_sar_v1` | 0.6456 | 0.4378 | -0.0199 |
+| `text_only_v1` | 0.6454 | 0.4378 | -0.0201 |
+| `indicators_only_v2` | 0.5099 | 0.2866 | -0.1556 |
+| `stacking_v1` | 0.6524 | 0.3558 | -0.0131 |
+
+运行诊断配置：
+
+```bash
+python -m decision.experiments.run_manifest \
+  --manifest decision/experiments/manifests/diagnostics_v1.yaml
+```
+
+比较已有诊断 run：
+
+```bash
+python -m decision.eval.compare \
+  --manifest decision/experiments/manifests/diagnostics_v1.yaml
+```
+
+### 当前结论定位
+
+`modality_sep_v1` 是论文 baseline：`ρ = 0.6655`，`R² = 0.4600`。SVF 三种变体均带来 ≤ 0.005 的微弱 ρ / R² 增益，落在噪声区间内；最稳定的是 SegFormer SVF（ρ=0.6682, R²=0.4644），可作为论文上限报告，但不应解读为新信息源。
+
+`stacking_v1` 在新口径下 ρ 和 R² 双双低于 baseline（Δρ = -0.0131，ΔR² = -0.1042）：二层 HGB→Ridge 融合在 stacked 评估下损失了数值校准，且没有保留排序优势——不再作为最优方案保留。
+
+SAR 诊断链路解释 full baseline 的来源：`sar_only_v1` 衡量空间标签滞后本身，`no_sar_v1` 衡量视觉/POI/空间嵌入在不看邻居标签时的能力，`residual_after_sar_v1` 衡量视觉特征能否解释 SAR 剩余误差。三者必须和 `full_v1` 一起报告，避免把空间插值能力误写成纯视觉理解能力。
+
+indicators 拼接保留为消融：17 个 VLM domain indicators 的语义已与 SBERT/SAR 主信号高度重叠，直接拼入 RidgeCV 几乎无增益。
 
 ---
 
@@ -83,8 +203,15 @@ perception JSONL
 [3] Datazone 级聚合（dz_agg）  多张图 → 每 DZ 唯一嵌入（mean-pool 修复重复 DZ bug）
     │
     ▼
+[3.5] SVF 特征注入（可选，仅 cv_runner_svf）
+    │  ├─ 语义分割类别比例（SegFormer-B2 / MIT PSP，每 DZ 街景均值/标准差）
+    │  ├─ 全局缺失（无街景 DZ）置 NaN
+    │  └─ per-fold 用 train 集列均值插补（无 val 泄漏）
+    │  → 拼接到 X_text 末尾，spatial lag / ego-gap 自动覆盖 SVF 列
+    │
+    ▼
 [4] 空间特征拼接（per fold）
-    │  ├─ 空间滞后：concat([self, neighbor_mean]) → 3072-dim
+    │  ├─ 空间滞后：concat([self, neighbor_mean]) → 3072-dim（含 SVF 时维度相应增加）
     │  ├─ Ego-gap：改为 concat([self, self−neighbor_mean])（避免秩亏）
     │  ├─ POI 数值向量（PoiFitter，per fold 拟合）
     │  └─ SAR 目标滞后：mean(y_train_neighbors)，7-dim（无 val 标签泄漏）
@@ -130,14 +257,14 @@ python -m decision.data.build_dataset \
 
 ```bash
 python -m decision.train.cv_runner_caption \
-    --config decision/configs/route_c_modality_sep_v0.yaml
+    --config decision/configs/route_c_modality_sep_v1.yaml
 ```
 
-**配置文件（`route_c_modality_sep_v0.yaml`）：**
+**配置文件（`route_c_modality_sep_v1.yaml`）：**
 
 ```yaml
-dataset: outputs/decision/dataset_v0.jsonl
-out_dir: outputs/decision/route_c/modality_sep_v0
+dataset: outputs/decision/dataset_v1.jsonl
+out_dir: outputs/decision/route_c/modality_sep_v1
 
 caption:
   mode: modality_sep        # 分模态编码，非 concat
@@ -278,7 +405,35 @@ for i, s in enumerate(samples):
 
 `PoiFitter` 在每 fold 的 train 集上拟合，避免 val 集 POI 频率分布泄漏到 z-score 计算。
 
-#### 2g. RidgeCV 数值稳定性
+#### 2g. SVF 特征（可选）
+
+街景图像的语义分割可输出每张图的类别像素比例（建筑、植被、道路、天空等），按 datazone 聚合后作为低维结构化特征拼到 X_text。两种来源可单独或合并使用：
+
+| 特征源 | 类数 | parquet 路径 |
+|---|---|---|
+| SegFormer-B2 (ADE20K) | 15 类 | `outputs/perception/svf/datazone_svf_segformer.parquet` |
+| MIT PSPNet (ADE20K) | 15 类 | `outputs/perception/svf/datazone_svf_mitpsp.parquet` |
+
+每行字段：`datazone, <class>_mean, <class>_std`（按街景图取 DZ 内均值/标准差）。配置 `svf.columns: [mean]` 取 15-dim 比例向量；`[mean, std]` 取 30-dim。
+
+**注入位置**：在 `dz_agg` 之后、空间特征拼接之前 concat 到 X_text 末尾。后续 spatial lag / ego-gap / SAR 自动作用于全部列（包括 SVF），即 SVF 也享有空间溢出。
+
+**缺失处理**（无街景 DZ）：
+- 全局：缺失 DZ 该列为 NaN
+- per-fold：用该 fold 训练集 DZ 的列均值插补，避免用 val 集分布信息
+
+**调用入口**（不走主线 `cv_runner_caption.py`）：
+
+```bash
+python -m decision.train.cv_runner_svf \
+  --config decision/configs/svf/route_c_modality_sep_svf_segformer_v0.yaml
+```
+
+代码位置：[train/cv_runner_svf.py](train/cv_runner_svf.py) `load_svf_matrix()` / `_impute_fold()`。
+
+> 当前结论：三种 SVF 变体相对 baseline 增益 ≤ 0.005（落在噪声区间），保留为可选消融，论文 baseline 仍是 `modality_sep_v1`。
+
+#### 2h. RidgeCV 数值稳定性
 
 特征维度 3072-dim（1536 × 2 + 7 SAR + poi_dim）远超 n_train ≈ 600，高维低方差列（如 ego-gap 中接近零的维度）经 StandardScaler 放大后，RidgeCV 的 GCV / SVD 内部运算会出现数值溢出。
 
@@ -304,9 +459,9 @@ Pipeline([
 ### 第三步：评估
 
 ```bash
-python scripts/evaluation/eval_decision_oof.py \
-  --oof-jsonl outputs/decision/route_c/modality_sep_v0/oof_predictions.jsonl \
-  --output-dir outputs/evaluation/decision_modality_sep_v0 \
+python evaluation/eval_decision_oof.py \
+  --oof-jsonl outputs/decision/route_c/modality_sep_v1/oof_predictions.jsonl \
+  --output-dir outputs/evaluation/decision_modality_sep_v1 \
   --no-spatial --no-pdf
 ```
 
@@ -319,7 +474,7 @@ python scripts/evaluation/eval_decision_oof.py \
 
 ## 与 ceiling_v0 对比
 
-`sbert_ceiling_v0`（OOF ρ = 0.511）与 `modality_sep_v0` 的唯一区别是编码方式：
+`sbert_ceiling_v0`（OOF ρ = 0.6458, R² = 0.4338）与 `modality_sep_v0`（OOF ρ = 0.6673, R² = 0.4625）的唯一区别是编码方式：
 
 | 项目 | ceiling_v0 | modality_sep_v0 |
 |---|---|---|
@@ -350,79 +505,9 @@ for name, path in [
 
 ---
 
-## 参考：其他路线运行命令
+## 历史路线
 
-### Route C ceiling_v0（单向量版上限，对比基准）
-
-```bash
-python -m decision.train.cv_runner_caption \
-    --config decision/configs/route_c_ceiling_v0.yaml
-```
-
-### Route C 消融实验
-
-```bash
-# 基础版（无空间 / POI / ego / SAR）
-python -m decision.train.cv_runner_caption \
-    --config decision/configs/route_c_caption_embed.yaml \
-    --out-dir outputs/decision/route_c/sbert_minilm_v0
-
-# 仅加空间滞后
-python -m decision.train.cv_runner_caption \
-    --config decision/configs/route_c_caption_embed.yaml \
-    --use-spatial-lag \
-    --out-dir outputs/decision/route_c/sbert_spatial_v0
-
-# 空间 + POI
-python -m decision.train.cv_runner_caption \
-    --config decision/configs/route_c_caption_embed.yaml \
-    --use-spatial-lag --use-poi-vec \
-    --out-dir outputs/decision/route_c/sbert_spatial_poi_v0
-```
-
-### Route A'（LightGBM）
-
-```bash
-python -m decision.data.build_dataset \
-  --perception outputs/perception/qwen3vl_8b_perception.jsonl \
-  --simd dataset/SIMD/SIMD_score.csv \
-  --out outputs/decision/dataset_v0.jsonl
-
-python -m decision.train.cv_runner_lgbm \
-  --config decision/configs/route_a_lgbm.yaml
-```
-
-### Route B（需远程 GPU + Qwen3-8B）
-
-```bash
-# 下载模型
-huggingface-cli download Qwen/Qwen3-8B --local-dir models/Qwen3-8B
-
-# 启动 vLLM
-vllm serve models/Qwen3-8B --port 8000
-
-# 教师 CoT 生成 → SFT 数据集 → LoRA 训练 → 推理
-python -m decision.models.route_b.rationalizer  --config decision/configs/route_b_llm_sft.yaml
-python -m decision.models.route_b.sft_dataset   --dataset outputs/decision/dataset_v0.jsonl ...
-python -m decision.models.route_b.train_sft     --config decision/configs/route_b_llm_sft.yaml ...
-python -m decision.infer.route_b_predict        --config decision/configs/route_b_llm_sft.yaml ...
-```
-
----
-
-## 路线间假设检验
-
-对多路线 OOF 预测进行两两比较（Wilcoxon signed-rank + Bootstrap Spearman Δρ CI）：
-
-```bash
-python -m decision.eval.hypothesis_test \
-  --out-dir outputs/decision/compare/hypothesis_v0 \
-  --route-a-mlp   outputs/decision/route_a/bge_m3_v0/oof_predictions.jsonl \
-  --route-a-lgbm  outputs/decision/route_a_lgbm/bge_m3_v0/oof_predictions.jsonl \
-  --route-c-ridge outputs/decision/route_c/modality_sep_v0/oof_predictions.jsonl
-```
-
-输出：`pairwise_hypothesis_test.csv`（每对路线 × 每域 p 值、Δρ）、`route_comparison_table.csv`。
+Route C v0 / ceiling、Route A、Route A'、Route B 和早期假设检验代码已移动到 [legacy/](../legacy/readme.md)。当前论文复现不再调用这些入口；如需恢复历史 baseline，请先阅读 legacy README 并检查旧 import 路径。
 
 ---
 
@@ -444,5 +529,5 @@ python -m decision.eval.hypothesis_test \
 |---|---|
 | IZ 分组 CV | [src/glasgow_vlm/splits.py](../src/glasgow_vlm/splits.py) `group_kfold_by_iz` |
 | Spearman 验证指标 | [src/glasgow_vlm/metrics.py](../src/glasgow_vlm/metrics.py) |
-| 全量评估（含 bootstrap CI） | [scripts/evaluation/evaluate_domain_scores.py](../scripts/evaluation/evaluate_domain_scores.py) |
+| 全量评估（含 bootstrap CI） | [evaluation/evaluate_domain_scores.py](../evaluation/evaluate_domain_scores.py) |
 | 感知层输出 → 决策层数据集 | [data/build_dataset.py](data/build_dataset.py) |

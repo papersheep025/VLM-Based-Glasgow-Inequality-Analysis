@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="980" viewBox="0 0 1400 980" role="img" aria-labelledby="title desc">
+  <title id="title">Data Preparation Academic Pipeline</title>
+  <desc id="desc">Editable SVG flowchart showing raw inputs, three preprocessing branches, QA visualization, and output to perception.</desc>
+  <defs>
+    <style>
+      .bg { fill: #ffffff; }
+      .title { font: 700 34px "Arial", "Helvetica", "Noto Sans CJK SC", sans-serif; fill: #22252a; letter-spacing: 0; }
+      .subtitle { font: 400 16px "Arial", "Helvetica", "Noto Sans CJK SC", sans-serif; fill: #5d6470; letter-spacing: 0; }
+      .section-title { font: 700 24px "Arial", "Helvetica", "Noto Sans CJK SC", sans-serif; fill: #1f2630; letter-spacing: 0; }
+      .body { font: 400 19px "Arial", "Helvetica", "Noto Sans CJK SC", sans-serif; fill: #2d333b; letter-spacing: 0; }
+      .body-small { font: 400 16px "Arial", "Helvetica", "Noto Sans CJK SC", sans-serif; fill: #4b5563; letter-spacing: 0; }
+      .mono { font: 600 16px "Arial", "Helvetica", "Noto Sans CJK SC", sans-serif; fill: #2d333b; letter-spacing: 0; }
+      .tag { font: 700 15px "Arial", "Helvetica", "Noto Sans CJK SC", sans-serif; fill: #2d333b; letter-spacing: 0; }
+      .caption { font: 500 15px "Arial", "Helvetica", "Noto Sans CJK SC", sans-serif; fill: #5d6470; letter-spacing: 0; }
+      .box { stroke: #2f3640; stroke-width: 2.2; rx: 18; ry: 18; filter: url(#softShadow); }
+      .output { fill: #ffffff; stroke: #9aa4b2; stroke-width: 1.6; rx: 12; ry: 12; }
+      .rail { fill: none; stroke: #606a78; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+      .rail-dash { fill: none; stroke: #9aa4b2; stroke-width: 1.6; stroke-dasharray: 6 7; }
+      .arrow { fill: none; stroke: #606a78; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrowHead); }
+      .arrow-soft { fill: none; stroke: #7b8492; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrowHeadSoft); }
+      .badge-text { font: 700 17px "Arial", "Helvetica", sans-serif; fill: #ffffff; }
+    </style>
+    <filter id="softShadow" x="-8%" y="-10%" width="116%" height="125%">
+      <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#1f2937" flood-opacity="0.11"/>
+    </filter>
+    <marker id="arrowHead" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#606a78"/>
+    </marker>
+    <marker id="arrowHeadSoft" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7b8492"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1400" height="980"/>
+  <text class="title" x="700" y="62" text-anchor="middle">Data Preparation Pipeline for Glasgow Inequality Analysis</text>
+  <text class="subtitle" x="700" y="91" text-anchor="middle">Raw geospatial, street-view, POI, and SIMD inputs are transformed into aligned multimodal datasets for downstream perception.</text>
+
+  <rect class="box" x="250" y="130" width="900" height="230" fill="#FCE5D6"/>
+  <text class="section-title" x="700" y="174" text-anchor="middle">原始数据源  External / Raw Inputs</text>
+  <line x1="300" y1="195" x2="1100" y2="195" stroke="#c9a18b" stroke-width="1.6"/>
+
+  <g transform="translate(335 226)">
+    <circle cx="0" cy="-6" r="5" fill="#2f3640"/>
+    <text class="body" x="20" y="0">Glasgow datazone shapefile (746 zones)</text>
+    <circle cx="0" cy="30" r="5" fill="#2f3640"/>
+    <text class="body" x="20" y="36">卫星 GeoTIFF（glasgow.tif）</text>
+    <circle cx="0" cy="66" r="5" fill="#2f3640"/>
+    <text class="body" x="20" y="72">夜光 GeoTIFF（glasgow_ntl.tif）</text>
+  </g>
+  <g transform="translate(735 226)">
+    <circle cx="0" cy="-6" r="5" fill="#2f3640"/>
+    <text class="body" x="20" y="0">Mapillary / Google Street View API</text>
+    <circle cx="0" cy="30" r="5" fill="#2f3640"/>
+    <text class="body" x="20" y="36">OSM Overpass / Google Places API</text>
+    <circle cx="0" cy="66" r="5" fill="#2f3640"/>
+    <text class="body" x="20" y="72">SIMD 2020 score CSV</text>
+  </g>
+
+  <path class="rail" d="M700 360 L700 408"/>
+  <path class="rail" d="M332 408 L1068 408"/>
+  <path class="arrow" d="M332 408 L332 450"/>
+  <path class="arrow" d="M700 408 L700 450"/>
+  <path class="arrow" d="M1068 408 L1068 450"/>
+  <text class="caption" x="700" y="396" text-anchor="middle">modality-specific acquisition and alignment</text>
+
+  <rect class="rail-dash" x="125" y="430" width="1150" height="278" rx="22" ry="22"/>
+  <text class="caption" x="700" y="728" text-anchor="middle">standardized intermediate datasets</text>
+
+  <g id="branch-a">
+    <rect class="box" x="120" y="455" width="424" height="170" fill="#DFEBF7"/>
+    <circle cx="158" cy="494" r="19" fill="#567ea7"/>
+    <text class="badge-text" x="158" y="500" text-anchor="middle">A</text>
+    <text class="section-title" x="190" y="501">影像 Patch 裁剪</text>
+    <text class="body" x="190" y="535">(TIFF → PNG)</text>
+    <text class="body-small" x="158" y="573">datazone boundaries guide satellite and NTL patch extraction</text>
+    <path d="M155 591 L510 591" stroke="#abc5df" stroke-width="1.5"/>
+    <text class="tag" x="158" y="614">raster tiling</text>
+  </g>
+
+  <g id="branch-b">
+    <rect class="box" x="488" y="455" width="424" height="170" fill="#E2EFD9"/>
+    <circle cx="526" cy="494" r="19" fill="#6f9b5a"/>
+    <text class="badge-text" x="526" y="500" text-anchor="middle">B</text>
+    <text class="section-title" x="558" y="501">街景抓取与对齐</text>
+    <text class="body" x="558" y="535">(API → JPG)</text>
+    <text class="body-small" x="526" y="573">street-level imagery is sampled, filtered, and linked to zones</text>
+    <path d="M523 591 L878 591" stroke="#b7d0ab" stroke-width="1.5"/>
+    <text class="tag" x="526" y="614">viewpoint alignment</text>
+  </g>
+
+  <g id="branch-c">
+    <rect class="box" x="856" y="455" width="424" height="170" fill="#FFF2CC"/>
+    <circle cx="894" cy="494" r="19" fill="#b89431"/>
+    <text class="badge-text" x="894" y="500" text-anchor="middle">C</text>
+    <text class="section-title" x="926" y="501">POI 抓取与匹配</text>
+    <text class="body" x="926" y="535">(API → CSV)</text>
+    <text class="body-small" x="894" y="573">semantic urban amenities are queried and aggregated by datazone</text>
+    <path d="M891 591 L1246 591" stroke="#dcc675" stroke-width="1.5"/>
+    <text class="tag" x="894" y="614">spatial matching</text>
+  </g>
+
+  <path class="arrow-soft" d="M332 625 L332 652"/>
+  <path class="arrow-soft" d="M700 625 L700 652"/>
+  <path class="arrow-soft" d="M1068 625 L1068 652"/>
+
+  <g id="outputs">
+    <rect class="output" x="142" y="658" width="168" height="44"/>
+    <text class="mono" x="226" y="685" text-anchor="middle">datazone_patches/</text>
+    <rect class="output" x="322" y="658" width="186" height="44"/>
+    <text class="mono" x="415" y="685" text-anchor="middle">satellite_dataset/</text>
+
+    <rect class="output" x="594" y="658" width="212" height="44"/>
+    <text class="mono" x="700" y="685" text-anchor="middle">streetview_dataset/</text>
+
+    <rect class="output" x="918" y="658" width="150" height="44"/>
+    <text class="mono" x="993" y="685" text-anchor="middle">poi_dataset/</text>
+    <rect class="output" x="1080" y="658" width="138" height="44"/>
+    <text class="mono" x="1149" y="685" text-anchor="middle">osm_poi/</text>
+  </g>
+
+  <path class="rail" d="M226 702 L226 762 L700 762"/>
+  <path class="rail" d="M415 702 L415 762"/>
+  <path class="rail" d="M700 702 L700 762"/>
+  <path class="rail" d="M993 702 L993 762"/>
+  <path class="rail" d="M1149 702 L1149 762 L700 762"/>
+  <path class="arrow" d="M700 762 L700 791"/>
+
+  <g id="qa">
+    <rect class="box" x="390" y="795" width="620" height="112" fill="#EDEEF7"/>
+    <circle cx="432" cy="834" r="19" fill="#777aa6"/>
+    <text class="badge-text" x="432" y="840" text-anchor="middle">D</text>
+    <text class="section-title" x="466" y="841">验证 / 可视化（QA）</text>
+    <text class="body" x="466" y="876">Folium 交互地图 + 覆盖统计</text>
+  </g>
+
+  <path class="arrow" d="M700 907 L700 940"/>
+  <rect class="output" x="592" y="940" width="216" height="36" rx="18" ry="18"/>
+  <text class="mono" x="700" y="964" text-anchor="middle">perception/</text>
+</svg>

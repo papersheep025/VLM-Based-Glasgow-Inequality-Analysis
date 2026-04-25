@@ -55,6 +55,17 @@ def parse_args():
     p.add_argument("--no-quantization", action="store_true",
                    help="Load BF16 without 4-bit quantization.")
     p.add_argument("--merge-adapter", action="store_true")
+    p.add_argument("--skip-indicators", action="store_true",
+                   help="Skip the text-only domain_indicators second-pass (debug).")
+    p.add_argument("--require-indicators", action="store_true",
+                   help="Resume: only count a row as completed if it has both "
+                        "non-empty evidence and non-empty domain_indicators.")
+    p.add_argument("--patch-indicators-only", action="store_true",
+                   help="Read existing JSONL, only fill missing domain_indicators "
+                        "for rows that already have evidence; rewrite file in place. "
+                        "Mutually exclusive with the main inference loop.")
+    p.add_argument("--indicator-max-new-tokens", type=int, default=2048,
+                   help="max_new_tokens for the text-only indicator call.")
     return p.parse_args()
 
 
@@ -176,6 +187,54 @@ def build_single_image_messages(image: Image.Image, modality: str, fallback: boo
     return messages, [image]
 
 
+def _validate_indicators(parsed: dict) -> dict:
+    """Ensure every key in INDICATOR_KEYS is present with score in [0,4] and a string cue."""
+    di = parsed.get("domain_indicators") if isinstance(parsed, dict) else None
+    if not isinstance(di, dict):
+        return {}
+    out: dict[str, dict] = {}
+    for k in prompt_module.INDICATOR_KEYS:
+        v = di.get(k)
+        if not isinstance(v, dict):
+            return {}
+        score = v.get("score")
+        if isinstance(score, bool) or not isinstance(score, (int, float)):
+            return {}
+        score_int = int(score)
+        if score_int < 0 or score_int > 4:
+            return {}
+        cue = v.get("cue", "")
+        if cue is None:
+            cue = ""
+        out[k] = {"score": score_int, "cue": str(cue)[:120]}
+    return out
+
+
+def perceive_indicators(
+    model, processor, evidence: dict, poi_summary: str,
+    max_new_tokens: int, temperature: float,
+) -> dict:
+    """Text-only second pass: score 17 domain indicators from existing evidence."""
+    for attempt in range(2):
+        prompt_text = prompt_module.build_indicator_prompt(
+            evidence, poi_summary or None, minimal=(attempt == 1),
+        )
+        messages = [
+            {"role": "system", "content": prompt_module.SYSTEM_PROMPT},
+            {"role": "user", "content": [{"type": "text", "text": prompt_text}]},
+        ]
+        text = run_inference(model, processor, messages, None,
+                             max_new_tokens, temperature)
+        parsed = extract_json(text)
+        out = _validate_indicators(parsed)
+        if out:
+            return out
+        if attempt == 0:
+            print("    [indicators] empty/invalid, retrying with minimal prompt...")
+    print("    [indicators] WARNING: returned empty after retry")
+    return {}
+
+
 def perceive_image(model, processor, image: Image.Image, modality: str,
                    max_new_tokens: int, temperature: float) -> list[str]:
     for attempt in range(2):
@@ -291,7 +350,7 @@ def normalise_reasoning(parsed: dict) -> dict:
     return {"evidence": inner["evidence"]}
 
 
-def load_processed_ids(path: Path) -> set[str]:
+def load_processed_ids(path: Path, require_indicators: bool = False) -> set[str]:
     processed: set[str] = set()
     if not path.exists():
         return processed
@@ -305,8 +364,13 @@ def load_processed_ids(path: Path) -> set[str]:
             except Exception:
                 continue
             pid = row.get("patch_id")
-            evidence = (row.get("reasoning_json") or {}).get("evidence")
-            if pid and isinstance(evidence, dict) and evidence:
+            reasoning = row.get("reasoning_json") or {}
+            evidence = reasoning.get("evidence")
+            ok = bool(pid) and isinstance(evidence, dict) and bool(evidence)
+            if ok and require_indicators:
+                indicators = reasoning.get("domain_indicators")
+                ok = isinstance(indicators, dict) and bool(indicators)
+            if ok:
                 processed.add(str(pid))
     return processed
 
@@ -327,8 +391,66 @@ def run_inference(model, processor, messages, images, max_new_tokens, temperatur
     return processor.batch_decode(out[:, input_len:], skip_special_tokens=True)[0]
 
 
+def patch_indicators_only(args, model, processor) -> None:
+    """Read existing JSONL and fill missing domain_indicators in place.
+
+    Only rows with non-empty evidence and missing/empty domain_indicators are
+    updated. The file is rewritten atomically (write to .tmp then rename).
+    """
+    src = args.output_jsonl
+    if not src.exists():
+        print(f"[patch] file not found: {src}")
+        return
+    tmp = src.with_suffix(src.suffix + ".tmp")
+    rows: list[dict] = []
+    with open(src, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rows.append(json.loads(line))
+            except Exception:
+                continue
+
+    n_updated = 0
+    n_skipped = 0
+    with open(tmp, "w", encoding="utf-8") as out:
+        for idx, row in enumerate(rows, start=1):
+            reasoning = row.get("reasoning_json") or {}
+            evidence = reasoning.get("evidence")
+            existing = reasoning.get("domain_indicators")
+            need = (
+                isinstance(evidence, dict) and bool(evidence)
+                and not (isinstance(existing, dict) and existing)
+            )
+            if not need:
+                n_skipped += 1
+            else:
+                pid = row.get("patch_id", "?")
+                print(f"[patch {idx}/{len(rows)}] {pid} — scoring indicators")
+                poi_list = evidence.get("POI", [])
+                poi_summary = poi_list[0] if poi_list else ""
+                indicators = perceive_indicators(
+                    model, processor, evidence, poi_summary,
+                    args.indicator_max_new_tokens, args.temperature,
+                )
+                reasoning["domain_indicators"] = indicators
+                row["reasoning_json"] = reasoning
+                if indicators:
+                    n_updated += 1
+            out.write(json.dumps(row, ensure_ascii=False) + "\n")
+    tmp.replace(src)
+    print(f"\n[patch] done. updated={n_updated}, skipped={n_skipped}, total={len(rows)}")
+
+
 def main():
     args = parse_args()
+
+    if args.patch_indicators_only:
+        model, processor = load_model(args)
+        patch_indicators_only(args, model, processor)
+        return
 
     sat_meta = load_satellite_meta(args.satellite_meta)
     poi_meta = load_poi(args.poi_csv)
@@ -351,7 +473,10 @@ def main():
 
     args.output_jsonl.parent.mkdir(parents=True, exist_ok=True)
     resume = args.output_jsonl.exists() and not args.overwrite
-    processed = load_processed_ids(args.output_jsonl) if resume else set()
+    processed = (
+        load_processed_ids(args.output_jsonl, require_indicators=args.require_indicators)
+        if resume else set()
+    )
     mode = "a" if resume else "w"
 
     model, processor = load_model(args)
@@ -395,7 +520,16 @@ def main():
             poi_summary = rec.get("poi_summary", "")
             evidence["POI"] = [poi_summary] if poi_summary else ["no POI recorded"]
 
-            reasoning = {"evidence": evidence}
+            indicators: dict = {}
+            if not args.skip_indicators and evidence:
+                indicators = perceive_indicators(
+                    model, processor, evidence, poi_summary,
+                    args.indicator_max_new_tokens, args.temperature,
+                )
+                if indicators:
+                    print(f"  indicators: {len(indicators)} scored")
+
+            reasoning = {"evidence": evidence, "domain_indicators": indicators}
             row = {
                 "patch_id": rec["patch_id"],
                 "datazone": dz,

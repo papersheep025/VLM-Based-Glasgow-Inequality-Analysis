@@ -3,7 +3,7 @@
 
 Flow
 ----
-1. Load ``dataset_v0.jsonl``.
+1. Load ``dataset_v1.jsonl``.
 2. Build one caption string per sample (concat or CityLens-style templated).
 3. Encode captions once with BERT mean-pool or Sentence-BERT, cache to
    ``caption_cache.pt``.  Cache is reused across folds and across reruns when
@@ -16,17 +16,15 @@ Flow
      - fit on raw SIMD scores [1, 10] (no logit normalisation),
      - collect val predictions.
 6. Aggregate OOF predictions into ``oof_predictions.jsonl`` using the project's
-   standard ``prediction_json`` schema (same as Route A / A').
+   standard ``prediction_json`` schema.
 
 CLI:
     python -m decision.train.cv_runner_caption \
-        --config decision/configs/route_c_caption_embed.yaml
+        --config decision/configs/route_c_modality_sep_v1.yaml
 
-    # enable spatial lag:
+    # no-SAR diagnostic:
     python -m decision.train.cv_runner_caption \
-        --config decision/configs/route_c_caption_embed.yaml \
-        --use-spatial-lag \
-        --out-dir outputs/decision/route_c/sbert_spatial_v0
+        --config decision/configs/diagnostics/route_c_modality_sep_v1_no_sar.yaml
 """
 
 from __future__ import annotations
@@ -142,6 +140,23 @@ def run_cv(
     cache_path = out_dir / "caption_cache.pt"
     cache_dzs, X = build_or_load_captions(samples, cache_path, cfg)
 
+    # Modality ablation: zero out slices of the 1536-dim modality_sep embedding.
+    # Order from encode_modality_sep: [sat | ntl | sv | poi], each 384-dim.
+    if cfg.caption_mode == "modality_sep" and (cfg.ablate_modalities or cfg.keep_modalities):
+        d = X.shape[1] // 4
+        slices = {"sat": (0, d), "ntl": (d, 2*d), "sv": (2*d, 3*d), "poi": (3*d, 4*d)}
+        if cfg.keep_modalities:
+            to_zero = [m for m in slices if m not in set(cfg.keep_modalities)]
+            mode_str = f"keep={cfg.keep_modalities}"
+        else:
+            to_zero = list(cfg.ablate_modalities)
+            mode_str = f"ablate={cfg.ablate_modalities}"
+        X = X.copy()
+        for m in to_zero:
+            a, b = slices[m]
+            X[:, a:b] = 0.0
+        print(f"[ablate] modality_sep mask: {mode_str}, zeroed={to_zero}")
+
     if cfg.use_dz_agg:
         cache_dzs, X, dz_index = _aggregate_X_by_dz(samples, X)
         print(f"[dz_agg] aggregated to {len(cache_dzs)} unique datazones "
@@ -247,6 +262,11 @@ def _main() -> None:
     parser.add_argument("--no-sar-lag", dest="use_sar_lag", action="store_false")
     parser.add_argument("--use-dz-agg", action="store_true", default=None)
     parser.add_argument("--no-dz-agg", dest="use_dz_agg", action="store_false")
+    parser.add_argument("--use-domain-indicators", action="store_true", default=None)
+    parser.add_argument("--no-domain-indicators",
+                        dest="use_domain_indicators", action="store_false")
+    parser.add_argument("--use-latlon", action="store_true", default=None)
+    parser.add_argument("--no-latlon", dest="use_latlon", action="store_false")
     parser.add_argument("--n-splits", type=int, default=None)
     parser.add_argument("--seed", type=int, default=None)
     args = parser.parse_args()
@@ -278,6 +298,11 @@ def _main() -> None:
         use_ego_gap=pick(args.use_ego_gap, tr_y.get("use_ego_gap"), False),
         use_sar_lag=pick(args.use_sar_lag, tr_y.get("use_sar_lag"), False),
         use_dz_agg=pick(args.use_dz_agg, tr_y.get("use_dz_agg"), False),
+        use_domain_indicators=pick(args.use_domain_indicators,
+                                   tr_y.get("use_domain_indicators"), False),
+        use_latlon=pick(args.use_latlon, tr_y.get("use_latlon"), False),
+        ablate_modalities=tr_y.get("ablate_modalities") or [],
+        keep_modalities=tr_y.get("keep_modalities") or [],
         seed=pick(args.seed, tr_y.get("seed"), 42),
     )
     n_splits = pick(args.n_splits, cv_y.get("n_splits"), 5)

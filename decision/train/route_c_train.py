@@ -39,6 +39,10 @@ class RouteCConfig:
     use_ego_gap: bool = False   # append (X_self − X_nbr_mean) as extra features
     use_sar_lag: bool = False   # append mean(y_train_neighbors) per domain as features
     use_dz_agg: bool = False    # mean-pool duplicate samples per datazone before indexing
+    use_domain_indicators: bool = False  # append 17 VLM Likert scores + 1 missing flag
+    use_latlon: bool = False    # append EPSG:27700 (centroid_x, centroid_y) in meters
+    ablate_modalities: list[str] = field(default_factory=list)  # zero out these modality slices
+    keep_modalities: list[str] = field(default_factory=list)    # if non-empty, zero out all OTHERS
     seed: int = 42
     domains: list[str] = field(default_factory=lambda: list(DOMAINS))
 
@@ -87,6 +91,34 @@ def _target_lag_features(
 
 def _poi_vectors(samples: list[dict], fitter: PoiFitter) -> np.ndarray:
     return np.stack([fitter.transform(s) for s in samples]).astype(np.float32)
+
+
+def _indicator_features(samples: list[dict]) -> np.ndarray:
+    """Stack 17 Likert scores + 1 missing flag per sample → shape (n, 18).
+
+    A sample with indicators_missing=1 yields a zero score vector + flag=1, so
+    the Ridge can learn to down-weight it without leaking arbitrary defaults.
+    """
+    rows = []
+    for s in samples:
+        missing = int(s.get("indicators_missing", 1))
+        if missing:
+            vec = np.zeros(17, dtype=np.float32)
+        else:
+            vec = np.asarray(s.get("indicators_vec", [0.0] * 17), dtype=np.float32)
+            if vec.shape[0] != 17:
+                vec = np.zeros(17, dtype=np.float32)
+                missing = 1
+        rows.append(np.concatenate([vec, np.array([float(missing)], dtype=np.float32)]))
+    return np.stack(rows).astype(np.float32)
+
+
+def _latlon_features(samples: list[dict]) -> np.ndarray:
+    """Stack EPSG:27700 (centroid_x, centroid_y) per sample → shape (n, 2)."""
+    return np.array(
+        [[float(s.get("centroid_x", 0.0)), float(s.get("centroid_y", 0.0))] for s in samples],
+        dtype=np.float32,
+    )
 
 
 def _mean_spearman(pred: np.ndarray, target: np.ndarray) -> tuple[float, dict[str, float]]:
@@ -152,6 +184,18 @@ def train_fold_caption(
         sar_va = _target_lag_features(val_samples, neighbors, dz_to_y, global_mean)
         X_tr = np.concatenate([X_tr, sar_tr], axis=1)
         X_va = np.concatenate([X_va, sar_va], axis=1)
+
+    if cfg.use_domain_indicators:
+        ind_tr = _indicator_features(train_samples)
+        ind_va = _indicator_features(val_samples)
+        X_tr = np.concatenate([X_tr, ind_tr], axis=1)
+        X_va = np.concatenate([X_va, ind_va], axis=1)
+
+    if cfg.use_latlon:
+        xy_tr = _latlon_features(train_samples)
+        xy_va = _latlon_features(val_samples)
+        X_tr = np.concatenate([X_tr, xy_tr], axis=1)
+        X_va = np.concatenate([X_va, xy_va], axis=1)
 
     base = build_regressor(cfg.regressor, seed=cfg.seed)
     fitted_pipelines = []

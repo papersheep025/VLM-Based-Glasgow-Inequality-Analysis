@@ -1,0 +1,81 @@
+base_dir: .
+# Metric: legacy stacked + datazone-aggregated (same as paper_v1).
+out_csv: outputs/evaluation/diagnostics_v1_comparison.csv
+
+runs:
+  - name: full_v1
+    path: outputs/decision/route_c/modality_sep_v1
+  - name: sar_only_v1
+    path: outputs/decision/route_c/diagnostics_sar_only_v1
+  - name: no_sar_v1
+    path: outputs/decision/route_c/diagnostics_no_sar_v1
+  - name: residual_after_sar_v1
+    path: outputs/decision/route_c/diagnostics_residual_after_sar_v1
+  - name: no_spatial_no_sar_v1
+    path: outputs/decision/route_c/diagnostics_no_spatial_no_sar_v1
+  - name: text_only_v1
+    path: outputs/decision/route_c/diagnostics_text_only_v1
+  - name: indicators_only_v2
+    path: outputs/decision/route_c/indicators_only_v2
+  - name: stacking_v1
+    path: outputs/decision/route_c/stacking_v1
+
+experiments:
+  - name: sar_only_v1
+    cmd:
+      - .venv/bin/python
+      - evaluation/spatial_residual_diagnostics.py
+      - --mode
+      - sar_only
+      - --config
+      - decision/configs/route_c_modality_sep_v1.yaml
+      - --out-dir
+      - outputs/decision/route_c/diagnostics_sar_only_v1
+  - name: no_sar_v1
+    cmd:
+      - .venv/bin/python
+      - -m
+      - decision.train.cv_runner_caption
+      - --config
+      - decision/configs/diagnostics/route_c_modality_sep_v1_no_sar.yaml
+  - name: residual_after_sar_v1
+    cmd:
+      - .venv/bin/python
+      - evaluation/spatial_residual_diagnostics.py
+      - --mode
+      - residual_after_sar
+      - --config
+      - decision/configs/diagnostics/route_c_modality_sep_v1_no_sar.yaml
+      - --out-dir
+      - outputs/decision/route_c/diagnostics_residual_after_sar_v1
+      - --cache-source
+      - outputs/decision/route_c/modality_sep_v1/caption_cache.pt
+  - name: no_spatial_no_sar_v1
+    cmd:
+      - .venv/bin/python
+      - -m
+      - decision.train.cv_runner_caption
+      - --config
+      - decision/configs/diagnostics/route_c_modality_sep_v1_no_spatial_no_sar.yaml
+  - name: text_only_v1
+    cmd:
+      - .venv/bin/python
+      - -m
+      - decision.train.cv_runner_caption
+      - --config
+      - decision/configs/diagnostics/route_c_modality_sep_v1_text_only.yaml
+  - name: indicators_only_v2
+    cmd:
+      - .venv/bin/python
+      - evaluation/indicator_only_cv.py
+      - --perception
+      - outputs/perception/qwen3vl_8b_perception_v2.jsonl
+      - --out-dir
+      - outputs/decision/route_c/indicators_only_v2
+
+compare_cmd:
+  - "{python}"
+  - -m
+  - decision.eval.compare
+  - --manifest
+  - decision/experiments/manifests/diagnostics_v1.yaml

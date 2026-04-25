@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1150" viewBox="0 0 1600 1150">
+  <defs>
+    <style>
+      .title { font-family: Arial, 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif; font-size: 34px; font-weight: 700; fill: #1f2937; }
+      .subtitle { font-family: Arial, 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif; font-size: 18px; fill: #4b5563; }
+      .box-title { font-family: Arial, 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif; font-size: 25px; font-weight: 700; fill: #111827; }
+      .box-text { font-family: Arial, 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif; font-size: 19px; fill: #374151; }
+      .small-text { font-family: Arial, 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif; font-size: 17px; fill: #4b5563; }
+      .label { font-family: Arial, 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif; font-size: 18px; font-weight: 600; fill: #374151; }
+      .mono { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 17px; fill: #374151; }
+      .box { stroke: #374151; stroke-width: 2; rx: 22; ry: 22; filter: url(#shadow); }
+      .thin-box { stroke: #6b7280; stroke-width: 1.6; rx: 16; ry: 16; }
+      .arrow { stroke: #374151; stroke-width: 2.4; fill: none; marker-end: url(#arrowhead); }
+      .arrow-soft { stroke: #6b7280; stroke-width: 2; fill: none; marker-end: url(#arrowheadSoft); }
+      .dash { stroke-dasharray: 7 7; }
+      .section-label { font-family: Arial, 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 1.2px; fill: #6b7280; }
+    </style>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrowhead" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#374151"/>
+    </marker>
+    <marker id="arrowheadSoft" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6b7280"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="1150" fill="#ffffff"/>
+
+  <!-- Header -->
+  <text x="800" y="68" text-anchor="middle" class="title">Multimodal Urban Inequality Data Construction Framework</text>
+  <text x="800" y="101" text-anchor="middle" class="subtitle">Raw geospatial, visual, POI and SIMD inputs → aligned multimodal evidence for the perception layer</text>
+
+  <!-- Raw inputs -->
+  <text x="118" y="146" class="section-label">STAGE 0 · EXTERNAL / RAW INPUTS</text>
+  <rect x="110" y="165" width="1380" height="255" class="box" fill="#EDEEF7"/>
+  <text x="150" y="210" class="box-title">原始数据源（External / Raw Inputs）</text>
+
+  <g class="box-text">
+    <text x="170" y="255">─ Glasgow datazone shapefile（746 zones）</text>
+    <text x="170" y="290">─ 卫星 GeoTIFF（glasgow.tif）</text>
+    <text x="170" y="325">─ 夜光 GeoTIFF（glasgow_ntl.tif）</text>
+    <text x="825" y="255">─ Mapillary / Google Street View API</text>
+    <text x="825" y="290">─ OSM Overpass / Google Places API</text>
+    <text x="825" y="325">─ SIMD 2020 score CSV</text>
+  </g>
+
+  <rect x="150" y="358" width="1300" height="38" rx="18" fill="#ffffff" opacity="0.62" stroke="#c7cad8"/>
+  <text x="800" y="383" text-anchor="middle" class="small-text">Spatial reference + zone boundary + target labels + external visual / semantic observations</text>
+
+  <!-- Split node -->
+  <path class="arrow" d="M800 420 L800 475"/>
+  <circle cx="800" cy="494" r="13" fill="#374151"/>
+  <path class="arrow-soft" d="M800 494 L330 494 L330 555"/>
+  <path class="arrow-soft" d="M800 494 L800 555"/>
+  <path class="arrow-soft" d="M800 494 L1270 494 L1270 555"/>
+
+  <!-- Processing modules -->
+  <text x="118" y="527" class="section-label">STAGE 1 · DATA ACQUISITION AND ALIGNMENT</text>
+
+  <rect x="140" y="555" width="380" height="175" class="box" fill="#DFEBF7"/>
+  <text x="178" y="602" class="box-title">A. 影像 Patch 裁剪</text>
+  <text x="178" y="638" class="box-text">Satellite / NTL GeoTIFF</text>
+  <text x="178" y="671" class="box-text">按 datazone 边界裁剪</text>
+  <text x="178" y="704" class="mono">TIFF → PNG</text>
+
+  <rect x="610" y="555" width="380" height="175" class="box" fill="#FCE5D6"/>
+  <text x="648" y="602" class="box-title">B. 街景抓取与对齐</text>
+  <text x="648" y="638" class="box-text">Mapillary / Google SV API</text>
+  <text x="648" y="671" class="box-text">按 datazone 匹配采样点</text>
+  <text x="648" y="704" class="mono">API → JPG</text>
+
+  <rect x="1080" y="555" width="380" height="175" class="box" fill="#E2EFD9"/>
+  <text x="1118" y="602" class="box-title">C. POI 抓取与匹配</text>
+  <text x="1118" y="638" class="box-text">OSM / Google Places API</text>
+  <text x="1118" y="671" class="box-text">类别统计与空间连接</text>
+  <text x="1118" y="704" class="mono">API → CSV</text>
+
+  <!-- Output datasets -->
+  <path class="arrow" d="M330 730 L330 790"/>
+  <path class="arrow" d="M800 730 L800 790"/>
+  <path class="arrow" d="M1270 730 L1270 790"/>
+
+  <rect x="130" y="790" width="400" height="115" class="thin-box" fill="#ffffff"/>
+  <text x="160" y="827" class="label">Image patch outputs</text>
+  <text x="160" y="860" class="mono">datazone_patches/</text>
+  <text x="160" y="890" class="mono">satellite_dataset/</text>
+
+  <rect x="600" y="790" width="400" height="115" class="thin-box" fill="#ffffff"/>
+  <text x="630" y="827" class="label">Street-view outputs</text>
+  <text x="630" y="860" class="mono">streetview_dataset/</text>
+  <text x="630" y="890" class="mono">aligned image IDs</text>
+
+  <rect x="1070" y="790" width="400" height="115" class="thin-box" fill="#ffffff"/>
+  <text x="1100" y="827" class="label">POI outputs</text>
+  <text x="1100" y="860" class="mono">poi_dataset/</text>
+  <text x="1100" y="890" class="mono">osm_poi/</text>
+
+  <!-- Merge to QA -->
+  <path class="arrow-soft" d="M330 905 L330 955 L800 955"/>
+  <path class="arrow-soft" d="M800 905 L800 955"/>
+  <path class="arrow-soft" d="M1270 905 L1270 955 L800 955"/>
+  <path class="arrow" d="M800 955 L800 987"/>
+
+  <!-- QA -->
+  <text x="118" y="955" class="section-label">STAGE 2 · QUALITY ASSURANCE</text>
+  <rect x="445" y="987" width="710" height="115" class="box" fill="#FFF2CC"/>
+  <text x="490" y="1035" class="box-title">D. 验证 / 可视化（QA）</text>
+  <text x="490" y="1072" class="box-text">Folium 交互地图 + 覆盖统计</text>
+  <text x="905" y="1072" class="small-text">coverage, alignment, missingness</text>
+
+  <!-- Perception layer -->
+  <path class="arrow" d="M800 1102 L800 1132"/>
+  <rect x="620" y="1132" width="360" height="0" fill="none"/>
+  <text x="800" y="1145" text-anchor="middle" class="box-title">↓ perception 层</text>
+</svg>

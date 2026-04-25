@@ -133,3 +133,183 @@ def build_single_image_prompt(modality: str, fallback: bool = False) -> str:
     if modality == "nightlight":
         return _NTL_SINGLE
     return _STREETVIEW_FALLBACK if fallback else _STREETVIEW_SINGLE
+
+
+# ── Domain-indicator scoring (text-only second-pass) ─────────────────────────
+
+INDICATOR_KEYS = [
+    "physical_disorder",
+    "streetlight_presence",
+    "building_security_features",
+    "building_facade_condition",
+    "commercial_vitality",
+    "vehicle_quality",
+    "green_space_visible",
+    "active_travel_infra",
+    "food_retail_type",
+    "industrial_land_presence",
+    "housing_density_type",
+    "residential_upkeep",
+    "vegetation_satellite",
+    "road_surface_quality",
+    "land_use_diversity",
+    "nightlight_intensity",
+    "air_quality_proxy",
+]
+
+
+# (name, SIMD domain, what to look at, 0/2/4 anchor descriptions)
+DOMAIN_INDICATORS_SPEC: list[tuple[str, str, str, str]] = [
+    ("physical_disorder", "Crime",
+     "graffiti, litter, vandalism, broken windows in streetviews",
+     "0=none visible; 2=some litter or minor graffiti; 4=pervasive disorder"),
+    ("streetlight_presence", "Crime",
+     "lamp posts, lit street furniture in streetviews",
+     "0=none visible; 2=occasional lamp posts; 4=dense, regular lighting"),
+    ("building_security_features", "Crime",
+     "shutters, bars, fencing, security grilles in streetviews",
+     "0=none; 2=isolated shutters/grilles; 4=pervasive bars/fencing"),
+    ("building_facade_condition", "Income",
+     "facade upkeep: paint, render, masonry across streetviews",
+     "0=well kept; 2=patchy wear, peeling paint; 4=widespread damage"),
+    ("commercial_vitality", "Employment",
+     "active vs vacant shopfronts in streetviews and POI mix",
+     "0=mostly vacant or no commerce; 2=mixed; 4=many active shopfronts"),
+    ("vehicle_quality", "Income",
+     "age and type of parked/visible vehicles in streetviews",
+     "0=mostly old/derelict; 2=mixed mid-age; 4=many newer cars"),
+    ("green_space_visible", "Health",
+     "trees, parks, hedges from streetviews",
+     "0=no greenery; 2=scattered trees; 4=large park/canopy access"),
+    ("active_travel_infra", "Access",
+     "pavement width, cycle lanes, crossings in streetviews",
+     "0=none/narrow; 2=basic pavement; 4=wide pavements + cycle infra"),
+    ("food_retail_type", "Health",
+     "food retail mix in POI list (takeaways vs supermarkets vs grocers)",
+     "0=only fast-food/takeaways or none; 2=mixed; 4=fresh-food retailers present"),
+    ("industrial_land_presence", "Health",
+     "industrial sheds, yards, brownfield in satellite",
+     "0=none visible; 2=small yards; 4=large industrial premises"),
+    ("housing_density_type", "Housing",
+     "housing morphology in satellite (detached → tenement)",
+     "0=detached/low-density; 2=terraced; 4=dense tenement/flats"),
+    ("residential_upkeep", "Housing",
+     "roof, garden, refuse condition in streetviews and satellite",
+     "0=well kept; 2=some moss/clutter; 4=widespread neglect"),
+    ("vegetation_satellite", "Health",
+     "tree canopy and green cover from above (satellite)",
+     "0=bare/grey; 2=partial canopy; 4=extensive vegetation"),
+    ("road_surface_quality", "Access",
+     "tarmac condition, road markings, potholes in streetviews",
+     "0=poor/patched; 2=worn but usable; 4=smooth, well marked"),
+    ("land_use_diversity", "Access",
+     "mix of residential/commercial/amenity from POI + satellite",
+     "0=monofunctional; 2=mixed; 4=highly diverse"),
+    ("nightlight_intensity", "Income",
+     "brightness and concentration in nightlight patch",
+     "0=dark; 2=dim/scattered; 4=bright and concentrated"),
+    ("air_quality_proxy", "Health",
+     "traffic volume, industrial emissions, congestion proxies",
+     "0=quiet, no industry; 2=light traffic; 4=heavy traffic + industry"),
+]
+
+
+_INDICATOR_SYSTEM_TASK = (
+    "Indicator scoring task: given the visual + tabular evidence already extracted "
+    "for one Glasgow datazone, assign each of the listed indicators an integer score "
+    "from 0 to 4 and a short cue (<=8 words) citing the evidence that justifies it. "
+    "Score only what the listed evidence supports — do NOT fabricate observations and "
+    "do NOT label the area's deprivation level. If evidence is silent on an indicator, "
+    "use score 0 with cue \"no evidence\"."
+)
+
+
+def _format_indicator_spec() -> str:
+    lines = []
+    for name, domain, what, anchors in DOMAIN_INDICATORS_SPEC:
+        lines.append(f"- {name} (SIMD {domain}): look at {what}. Anchors: {anchors}.")
+    return "\n".join(lines)
+
+
+def _format_evidence_block(evidence: dict, max_streetviews: int = 6) -> str:
+    """Compact one-line-per-modality serialization of evidence dict."""
+    def _join(values) -> str:
+        if isinstance(values, list):
+            return "; ".join(str(v) for v in values if v)
+        return str(values) if values else ""
+
+    parts: list[str] = []
+    sat = _join(evidence.get("satellite", []))
+    if sat:
+        parts.append(f"satellite: {sat}")
+    ntl = _join(evidence.get("nightlight", []))
+    if ntl:
+        parts.append(f"nightlight: {ntl}")
+
+    sv_keys = sorted(k for k in evidence.keys() if k.startswith("streetview_"))
+    for k in sv_keys[:max_streetviews]:
+        sv = _join(evidence.get(k, []))
+        if sv:
+            parts.append(f"{k}: {sv}")
+    if len(sv_keys) > max_streetviews:
+        parts.append(f"(+{len(sv_keys) - max_streetviews} more streetviews omitted)")
+
+    poi = _join(evidence.get("POI", []))
+    if poi:
+        parts.append(f"POI: {poi}")
+    general = _join(evidence.get("general", []))
+    if general:
+        parts.append(f"general: {general}")
+    return "\n".join(parts)
+
+
+_INDICATOR_FORMAT_RULES = (
+    "Output exactly one JSON object: "
+    "{\"domain_indicators\": {\"<indicator_name>\": {\"score\": <int 0-4>, "
+    "\"cue\": \"<=8 words\"}, ...}}. "
+    "Include all 17 indicators listed below in that exact key order. "
+    "No prose outside JSON, no extra keys."
+)
+
+
+_INDICATOR_EXAMPLE = json.dumps({
+    "domain_indicators": {
+        "physical_disorder": {"score": 2, "cue": "graffiti on fence, scattered litter"},
+        "streetlight_presence": {"score": 3, "cue": "regular lamp posts on both sides"},
+    }
+}, ensure_ascii=False)
+
+
+def build_indicator_prompt(
+    evidence: dict,
+    poi_summary: str | None = None,
+    max_streetviews: int = 6,
+    minimal: bool = False,
+) -> str:
+    """Build a text-only prompt that asks the VLM to score 17 indicators.
+
+    minimal=True drops the cue requirement and uses a leaner spec — used as
+    a fallback retry when the full prompt fails to parse.
+    """
+    evidence_block = _format_evidence_block(evidence, max_streetviews=max_streetviews)
+    if poi_summary and "POI:" not in evidence_block:
+        evidence_block += f"\nPOI: {poi_summary}"
+
+    if minimal:
+        spec_lines = "\n".join(f"- {n}" for n in INDICATOR_KEYS)
+        return (
+            f"{_INDICATOR_SYSTEM_TASK}\n\n"
+            f"Evidence for this datazone:\n{evidence_block}\n\n"
+            f"Indicators (score each 0-4 integer):\n{spec_lines}\n\n"
+            "Return JSON only: {\"domain_indicators\": "
+            "{\"<name>\": {\"score\": <int 0-4>, \"cue\": \"\"}, ...}}. "
+            "Include all 17 indicators."
+        )
+
+    return (
+        f"{_INDICATOR_SYSTEM_TASK}\n\n"
+        f"Evidence for this datazone:\n{evidence_block}\n\n"
+        f"Indicators to score (in this order):\n{_format_indicator_spec()}\n\n"
+        f"{_INDICATOR_FORMAT_RULES}\n"
+        f"Example (truncated): {_INDICATOR_EXAMPLE}"
+    )

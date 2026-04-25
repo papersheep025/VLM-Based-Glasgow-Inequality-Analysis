@@ -1,0 +1,27 @@
+# Text-only Route C diagnostic.
+# Uses modality-separated SBERT embeddings only; no POI, spatial embedding lag,
+# ego-gap, SAR lag, indicators, or SVF.
+
+dataset: outputs/decision/dataset_v1.jsonl
+out_dir: outputs/decision/route_c/diagnostics_text_only_v1
+
+caption:
+  mode: modality_sep
+
+encoder:
+  backend: sbert
+  name: sentence-transformers/all-MiniLM-L6-v2
+  batch_size: 32
+  max_length: 256
+
+cv:
+  n_splits: 5
+
+train:
+  regressor: ridge_cv
+  use_poi_vec: false
+  use_spatial_lag: false
+  use_ego_gap: false
+  use_sar_lag: false
+  use_dz_agg: true
+  seed: 42

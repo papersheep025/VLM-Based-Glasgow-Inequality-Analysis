@@ -1,0 +1,41 @@
+# HGB on PCA-reduced SBERT (64) + ego-gap-PCA (64) + POI/SAR/indicators tail.
+# Goal: let HGB capture non-linear interactions on a regime where its dim is
+# closer to its sweet spot (<300 dim total) and indicators are not drowned by
+# 1500+ raw SBERT columns.
+
+dataset: outputs/decision/dataset_v1.jsonl
+out_dir: outputs/decision/route_c/modality_sep_v1_lgbm_pca_indicators
+
+caption:
+  mode: modality_sep
+
+encoder:
+  backend: sbert
+  name: sentence-transformers/all-MiniLM-L6-v2
+  batch_size: 32
+  max_length: 256
+
+cv:
+  n_splits: 5
+
+train:
+  use_poi_vec: true
+  use_spatial_lag: true
+  use_ego_gap: true
+  use_sar_lag: true
+  use_dz_agg: true
+  use_domain_indicators: true
+  seed: 42
+
+lgbm:
+  backend: hgb
+  sbert_pca_dim: 64       # 1536 → 64 for both SBERT_self and ego_gap blocks
+  n_estimators: 2000
+  learning_rate: 0.03
+  num_leaves: 31
+  min_data_in_leaf: 20
+  feature_fraction: 0.8
+  bagging_fraction: 0.8
+  bagging_freq: 5
+  lambda_l2: 1.0
+  early_stopping_rounds: 100

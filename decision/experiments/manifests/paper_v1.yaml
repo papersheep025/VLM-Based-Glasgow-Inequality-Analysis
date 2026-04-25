@@ -1,0 +1,107 @@
+base_dir: .
+# Metric: legacy stacked + datazone-aggregated.
+# All 7 domains are concatenated and a single Spearman / R^2 is computed,
+# matching the original `evaluate_domain_scores.py` `overall` row.
+out_csv: outputs/evaluation/paper_v1_route_c_comparison.csv
+
+# Canonical paper table order. The first run is the delta baseline.
+runs:
+  - name: modality_sep_v1
+    path: outputs/decision/route_c/modality_sep_v1
+  - name: modality_sep_v1_indicators
+    path: outputs/decision/route_c/modality_sep_v1_indicators
+  - name: modality_sep_svf_segformer_v1
+    path: outputs/decision/route_c/modality_sep_svf_segformer_v1
+  - name: modality_sep_svf_mitpsp_v1
+    path: outputs/decision/route_c/modality_sep_svf_mitpsp_v1
+  - name: modality_sep_svf_both_v1
+    path: outputs/decision/route_c/modality_sep_svf_both_v1
+  - name: modality_sep_v1_lgbm
+    path: outputs/decision/route_c/modality_sep_v1_lgbm
+  - name: modality_sep_v1_lgbm_pca_indicators
+    path: outputs/decision/route_c/modality_sep_v1_lgbm_pca_indicators
+  - name: indicators_only_v2
+    path: outputs/decision/route_c/indicators_only_v2
+  - name: stacking_v1
+    path: outputs/decision/route_c/stacking_v1
+
+# Reproducible commands. Run one with:
+#   python -m decision.experiments.run_manifest --manifest decision/experiments/manifests/paper_v1.yaml --only stacking_v1
+experiments:
+  - name: modality_sep_v1
+    cmd:
+      - .venv/bin/python
+      - -m
+      - decision.train.cv_runner_caption
+      - --config
+      - decision/configs/route_c_modality_sep_v1.yaml
+  - name: modality_sep_v1_indicators
+    cmd:
+      - .venv/bin/python
+      - -m
+      - decision.train.cv_runner_caption
+      - --config
+      - decision/configs/route_c_modality_sep_v1_indicators.yaml
+  - name: modality_sep_svf_segformer_v1
+    cmd:
+      - .venv/bin/python
+      - -m
+      - decision.train.cv_runner_svf
+      - --config
+      - decision/configs/svf/route_c_modality_sep_svf_segformer_v0.yaml
+  - name: modality_sep_svf_mitpsp_v1
+    cmd:
+      - .venv/bin/python
+      - -m
+      - decision.train.cv_runner_svf
+      - --config
+      - decision/configs/svf/route_c_modality_sep_svf_mitpsp_v0.yaml
+  - name: modality_sep_svf_both_v1
+    cmd:
+      - .venv/bin/python
+      - -m
+      - decision.train.cv_runner_svf
+      - --config
+      - decision/configs/svf/route_c_modality_sep_svf_both_v0.yaml
+  - name: modality_sep_v1_lgbm
+    cmd:
+      - .venv/bin/python
+      - -m
+      - decision.train.cv_runner_caption_lgbm
+      - --config
+      - decision/configs/route_c_modality_sep_v1_lgbm.yaml
+  - name: modality_sep_v1_lgbm_pca_indicators
+    cmd:
+      - .venv/bin/python
+      - -m
+      - decision.train.cv_runner_caption_lgbm
+      - --config
+      - decision/configs/route_c_modality_sep_v1_lgbm_pca_indicators.yaml
+  - name: indicators_only_v2
+    cmd:
+      - .venv/bin/python
+      - evaluation/indicator_only_cv.py
+      - --perception
+      - outputs/perception/qwen3vl_8b_perception_v2.jsonl
+      - --out-dir
+      - outputs/decision/route_c/indicators_only_v2
+  - name: stacking_v1
+    cmd:
+      - .venv/bin/python
+      - evaluation/stacking_v1.py
+      - --dataset
+      - outputs/decision/dataset_v1.jsonl
+      - --ridge-oof
+      - outputs/decision/route_c/modality_sep_v1/oof_predictions.jsonl
+      - --svf
+      - outputs/perception/svf/datazone_svf_segformer.parquet
+      - outputs/perception/svf/datazone_svf_mitpsp.parquet
+      - --out-dir
+      - outputs/decision/route_c/stacking_v1
+
+compare_cmd:
+  - "{python}"
+  - -m
+  - decision.eval.compare
+  - --manifest
+  - decision/experiments/manifests/paper_v1.yaml

@@ -1,0 +1,27 @@
+# Full v1 feature stack without SAR target lag.
+# Diagnostic purpose: estimate how much pooled rho comes from visual/POI/spatial
+# embedding features rather than train-neighbour target interpolation.
+
+dataset: outputs/decision/dataset_v1.jsonl
+out_dir: outputs/decision/route_c/diagnostics_no_sar_v1
+
+caption:
+  mode: modality_sep
+
+encoder:
+  backend: sbert
+  name: sentence-transformers/all-MiniLM-L6-v2
+  batch_size: 32
+  max_length: 256
+
+cv:
+  n_splits: 5
+
+train:
+  regressor: ridge_cv
+  use_poi_vec: true
+  use_spatial_lag: true
+  use_ego_gap: true
+  use_sar_lag: false
+  use_dz_agg: true
+  seed: 42

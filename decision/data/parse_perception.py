@@ -15,12 +15,43 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 import argparse
 from pathlib import Path
 from typing import Iterator
 
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from perception.prompts.perception import INDICATOR_KEYS  # noqa: E402
+
 
 _POI_PATTERN = re.compile(r"(\w+)\s*[×x]\s*(\d+)")
+
+
+def extract_domain_indicators(record: dict) -> tuple[np.ndarray, int]:
+    """Return (vec[17] float32, missing_flag in {0,1}).
+
+    Missing/invalid → zeros + flag=1. Valid → scores in 0..4 + flag=0.
+    """
+    di = (record.get("reasoning_json") or {}).get("domain_indicators")
+    if not isinstance(di, dict) or not di:
+        return np.zeros(len(INDICATOR_KEYS), dtype=np.float32), 1
+    scores = np.zeros(len(INDICATOR_KEYS), dtype=np.float32)
+    for i, k in enumerate(INDICATOR_KEYS):
+        entry = di.get(k)
+        if not isinstance(entry, dict):
+            return np.zeros(len(INDICATOR_KEYS), dtype=np.float32), 1
+        s = entry.get("score")
+        if isinstance(s, bool) or not isinstance(s, (int, float)):
+            return np.zeros(len(INDICATOR_KEYS), dtype=np.float32), 1
+        if s < 0 or s > 4:
+            return np.zeros(len(INDICATOR_KEYS), dtype=np.float32), 1
+        scores[i] = float(s)
+    return scores, 0
 
 
 def _parse_poi(poi_str: str) -> tuple[dict[str, int], int]:
@@ -60,6 +91,8 @@ def parse_record(record: dict) -> dict:
         poi_str = poi_raw[0] if poi_raw else "(no POI recorded)"
         poi_counts, poi_total = _parse_poi(poi_str)
 
+    indicators_vec, indicators_missing = extract_domain_indicators(record)
+
     return {
         "datazone": dz,
         "satellite": satellite,
@@ -68,6 +101,8 @@ def parse_record(record: dict) -> dict:
         "poi_text": poi_str,
         "poi_counts": poi_counts,
         "poi_total": poi_total,
+        "indicators_vec": indicators_vec.tolist(),
+        "indicators_missing": int(indicators_missing),
     }
 
 

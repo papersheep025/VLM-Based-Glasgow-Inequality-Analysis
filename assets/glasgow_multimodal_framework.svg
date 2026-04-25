@@ -1,0 +1,236 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="2450" viewBox="0 0 1800 2450">
+  <defs>
+    <style>
+      .title { font-family: 'Arial', 'Helvetica', sans-serif; font-size: 36px; font-weight: 700; fill: #1f2937; }
+      .subtitle { font-family: 'Arial', 'Helvetica', sans-serif; font-size: 18px; fill: #4b5563; }
+      .section-title { font-family: 'Arial', 'Helvetica', sans-serif; font-size: 24px; font-weight: 700; fill: #111827; }
+      .box-title { font-family: 'Arial', 'Helvetica', sans-serif; font-size: 20px; font-weight: 700; fill: #111827; }
+      .box-text { font-family: 'Arial', 'Helvetica', sans-serif; font-size: 16px; fill: #263238; }
+      .small-text { font-family: 'Arial', 'Helvetica', sans-serif; font-size: 14px; fill: #374151; }
+      .tiny-text { font-family: 'Arial', 'Helvetica', sans-serif; font-size: 13px; fill: #4b5563; }
+      .mono { font-family: 'Menlo', 'Consolas', monospace; font-size: 14px; fill: #374151; }
+      .pill-text { font-family: 'Arial', 'Helvetica', sans-serif; font-size: 14px; font-weight: 700; fill: #111827; }
+      .box { stroke: #334155; stroke-width: 1.6; rx: 18; ry: 18; }
+      .thin-box { stroke: #64748b; stroke-width: 1.2; rx: 14; ry: 14; }
+      .panel { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.4; rx: 28; ry: 28; }
+      .arrow { stroke: #475569; stroke-width: 2.2; fill: none; marker-end: url(#arrowhead); }
+      .arrow-soft { stroke: #64748b; stroke-width: 1.8; fill: none; marker-end: url(#arrowhead-soft); }
+      .dashed { stroke-dasharray: 8 7; }
+      .shadow { filter: url(#shadow); }
+    </style>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.11"/>
+    </filter>
+    <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M 0 0 L 10 4 L 0 8 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowhead-soft" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <path d="M 0 0 L 9 3.5 L 0 7 z" fill="#64748b"/>
+    </marker>
+    <linearGradient id="headerGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#DFEBF7"/>
+      <stop offset="52%" stop-color="#EDEEF7"/>
+      <stop offset="100%" stop-color="#E2EFD9"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1800" height="2450" fill="#f8fafc"/>
+
+  <!-- Header -->
+  <rect x="80" y="50" width="1640" height="115" rx="30" fill="url(#headerGrad)" stroke="#cbd5e1" stroke-width="1.4" class="shadow"/>
+  <text x="900" y="100" text-anchor="middle" class="title">Multimodal Urban Inequality Analysis Framework</text>
+  <text x="900" y="134" text-anchor="middle" class="subtitle">Glasgow Datazone · Street View + Satellite + Nightlight + POI · Perception-to-Decision Pipeline</text>
+
+  <!-- Legend -->
+  <g transform="translate(1180,185)">
+    <rect x="0" y="0" width="540" height="58" rx="18" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="18" y="35" class="small-text" font-weight="700">Palette</text>
+    <rect x="100" y="17" width="55" height="24" rx="8" fill="#FCE5D6" stroke="#cbd5e1"/>
+    <rect x="170" y="17" width="55" height="24" rx="8" fill="#DFEBF7" stroke="#cbd5e1"/>
+    <rect x="240" y="17" width="55" height="24" rx="8" fill="#E2EFD9" stroke="#cbd5e1"/>
+    <rect x="310" y="17" width="55" height="24" rx="8" fill="#FFF2CC" stroke="#cbd5e1"/>
+    <rect x="380" y="17" width="55" height="24" rx="8" fill="#EDEEF7" stroke="#cbd5e1"/>
+    <text x="454" y="35" class="tiny-text">editable SVG</text>
+  </g>
+
+  <!-- Section 1 Panel -->
+  <rect x="80" y="265" width="1640" height="560" class="panel shadow"/>
+  <text x="120" y="310" class="section-title">1. 数据准备与预处理  Data Preparation &amp; Preprocessing</text>
+
+  <!-- Raw inputs -->
+  <rect x="250" y="345" width="1300" height="150" class="box" fill="#FCE5D6"/>
+  <text x="900" y="380" text-anchor="middle" class="box-title">原始数据源  External / Raw Inputs</text>
+  <text x="290" y="415" class="box-text">• Glasgow datazone shapefile 746 zones</text>
+  <text x="290" y="445" class="box-text">• Satellite GeoTIFF: glasgow.tif</text>
+  <text x="290" y="475" class="box-text">• Nightlight GeoTIFF: glasgow_ntl.tif</text>
+  <text x="925" y="415" class="box-text">• Mapillary / Google Street View API</text>
+  <text x="925" y="445" class="box-text">• OSM Overpass / Google Places API</text>
+  <text x="925" y="475" class="box-text">• SIMD 2020 score CSV</text>
+
+  <path class="arrow" d="M900 495 L900 545"/>
+  <path class="arrow-soft" d="M900 535 C720 535 600 545 515 585"/>
+  <path class="arrow-soft" d="M900 535 C900 545 900 555 900 585"/>
+  <path class="arrow-soft" d="M900 535 C1080 535 1200 545 1285 585"/>
+
+  <!-- Prep branches -->
+  <rect x="200" y="585" width="360" height="110" class="box shadow" fill="#DFEBF7"/>
+  <text x="380" y="625" text-anchor="middle" class="box-title">A. 影像 Patch 裁剪</text>
+  <text x="380" y="657" text-anchor="middle" class="box-text">TIFF → PNG</text>
+  <text x="380" y="682" text-anchor="middle" class="mono">datazone_patches/ · satellite_dataset/</text>
+
+  <rect x="720" y="585" width="360" height="110" class="box shadow" fill="#E2EFD9"/>
+  <text x="900" y="625" text-anchor="middle" class="box-title">B. 街景抓取与对齐</text>
+  <text x="900" y="657" text-anchor="middle" class="box-text">API → JPG</text>
+  <text x="900" y="682" text-anchor="middle" class="mono">streetview_dataset/</text>
+
+  <rect x="1240" y="585" width="360" height="110" class="box shadow" fill="#FFF2CC"/>
+  <text x="1420" y="625" text-anchor="middle" class="box-title">C. POI 抓取与匹配</text>
+  <text x="1420" y="657" text-anchor="middle" class="box-text">API → CSV</text>
+  <text x="1420" y="682" text-anchor="middle" class="mono">poi_dataset/ · osm_poi/</text>
+
+  <path class="arrow-soft" d="M380 695 C380 745 650 745 760 760"/>
+  <path class="arrow-soft" d="M900 695 L900 755"/>
+  <path class="arrow-soft" d="M1420 695 C1420 745 1150 745 1040 760"/>
+
+  <rect x="660" y="755" width="480" height="70" class="box" fill="#EDEEF7"/>
+  <text x="900" y="785" text-anchor="middle" class="box-title">D. 验证 / 可视化 QA</text>
+  <text x="900" y="812" text-anchor="middle" class="box-text">Folium interactive map + coverage statistics → perception/</text>
+
+  <!-- Section 2 Panel -->
+  <rect x="80" y="880" width="1640" height="570" class="panel shadow"/>
+  <text x="120" y="925" class="section-title">2. 感知层主线与 SVF 分支  Perception Layer + SVF Branch</text>
+
+  <!-- Main perception pipeline -->
+  <rect x="150" y="965" width="850" height="82" class="box shadow" fill="#DFEBF7"/>
+  <text x="575" y="997" text-anchor="middle" class="box-title">Multimodal Dataset</text>
+  <text x="575" y="1027" text-anchor="middle" class="box-text">streetview + satellite + nightlight + POI</text>
+
+  <path class="arrow" d="M575 1047 L575 1088"/>
+  <rect x="150" y="1088" width="850" height="92" class="box shadow" fill="#E2EFD9"/>
+  <text x="575" y="1122" text-anchor="middle" class="box-title">perception/infer/perceive_local.py</text>
+  <text x="575" y="1153" text-anchor="middle" class="box-text">Qwen3-VL-8B → evidence phrases + domain_indicators</text>
+
+  <path class="arrow" d="M575 1180 L575 1222"/>
+  <rect x="150" y="1222" width="850" height="82" class="box shadow" fill="#FFF2CC"/>
+  <text x="575" y="1255" text-anchor="middle" class="box-title">decision/data/build_dataset.py</text>
+  <text x="575" y="1284" text-anchor="middle" class="mono">dataset_v1.jsonl</text>
+
+  <path class="arrow" d="M575 1304 L575 1346"/>
+  <rect x="150" y="1346" width="850" height="82" class="box shadow" fill="#EDEEF7"/>
+  <text x="575" y="1378" text-anchor="middle" class="box-title">Route-C Decision Inputs</text>
+  <text x="575" y="1408" text-anchor="middle" class="box-text">modality-separated SBERT + POI + spatial lag + ego-gap + SAR lag</text>
+
+  <!-- Ablation stack -->
+  <g transform="translate(1040,965)">
+    <rect x="0" y="0" width="620" height="335" class="box shadow" fill="#FCE5D6"/>
+    <text x="310" y="37" text-anchor="middle" class="box-title">Experiments &amp; Ablations</text>
+    <rect x="55" y="66" width="510" height="42" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="310" y="93" text-anchor="middle" class="box-text">RidgeCV baseline</text>
+    <rect x="55" y="121" width="510" height="42" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="310" y="148" text-anchor="middle" class="box-text">indicators ablation</text>
+    <rect x="55" y="176" width="510" height="42" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="310" y="203" text-anchor="middle" class="box-text">SegFormer / MIT PSP SVF ablation</text>
+    <rect x="55" y="231" width="510" height="42" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="310" y="258" text-anchor="middle" class="box-text">HGB / PCA-HGB ablation</text>
+    <rect x="55" y="286" width="510" height="42" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="310" y="313" text-anchor="middle" class="box-text">stacking ablation</text>
+  </g>
+  <path class="arrow-soft dashed" d="M1000 1387 C1110 1387 1130 1300 1130 1300"/>
+
+  <!-- SVF branch -->
+  <g transform="translate(1040,1330)">
+    <rect x="0" y="0" width="620" height="90" class="box shadow" fill="#DFEBF7"/>
+    <text x="310" y="35" text-anchor="middle" class="box-title">SVF Branch: raw streetview images</text>
+    <text x="310" y="65" text-anchor="middle" class="mono">segformer_infer.py / mitpsp_infer.py</text>
+  </g>
+  <path class="arrow-soft" d="M1350 1420 L1350 1465"/>
+  <rect x="1040" y="1465" width="620" height="82" class="box shadow" fill="#E2EFD9"/>
+  <text x="1350" y="1498" text-anchor="middle" class="box-title">Image-level SVF parquet</text>
+  <text x="1350" y="1527" text-anchor="middle" class="mono">perception/segmentation/aggregate.py</text>
+
+  <path class="arrow-soft" d="M1350 1547 L1350 1588"/>
+  <rect x="1040" y="1588" width="620" height="82" class="box shadow" fill="#FFF2CC"/>
+  <text x="1350" y="1621" text-anchor="middle" class="box-title">Datazone-level SVF parquet</text>
+  <text x="1350" y="1650" text-anchor="middle" class="mono">decision/train/cv_runner_svf.py</text>
+  <path class="arrow-soft dashed" d="M1040 1629 C870 1629 790 1470 650 1428"/>
+
+  <!-- Main output -->
+  <path class="arrow" d="M575 1428 L575 1480"/>
+  <rect x="150" y="1480" width="850" height="82" class="box shadow" fill="#DFEBF7"/>
+  <text x="575" y="1513" text-anchor="middle" class="box-title">OOF Decision Outputs</text>
+  <text x="575" y="1542" text-anchor="middle" class="mono">outputs/decision/route_c/*/oof_predictions.jsonl → decision/</text>
+
+  <!-- Section 3 Panel -->
+  <rect x="80" y="1725" width="1640" height="635" class="panel shadow"/>
+  <text x="120" y="1770" class="section-title">3. 决策层细化  Decision Layer</text>
+
+  <!-- Decision vertical pipeline -->
+  <g transform="translate(145,1810)">
+    <rect x="0" y="0" width="320" height="90" class="box shadow" fill="#FCE5D6"/>
+    <text x="160" y="34" text-anchor="middle" class="box-title">[1] dataset_v0.jsonl</text>
+    <text x="160" y="62" text-anchor="middle" class="small-text">sat / ntl / sv / poi_text</text>
+    <text x="160" y="82" text-anchor="middle" class="small-text">+ SIMD targets</text>
+  </g>
+  <path class="arrow" d="M465 1855 L555 1855"/>
+
+  <g transform="translate(555,1810)">
+    <rect x="0" y="0" width="360" height="150" class="box shadow" fill="#DFEBF7"/>
+    <text x="180" y="34" text-anchor="middle" class="box-title">[2] 分模态 SBERT 编码</text>
+    <text x="180" y="62" text-anchor="middle" class="box-text">4 × 384-dim → 1536-dim</text>
+    <text x="24" y="93" class="small-text">SAT / NTL: full-text encode</text>
+    <text x="24" y="118" class="small-text">SV: phrase encode → mean-pool</text>
+    <text x="24" y="143" class="small-text">POI: full-text encode</text>
+  </g>
+  <path class="arrow" d="M915 1855 L1005 1855"/>
+
+  <g transform="translate(1005,1810)">
+    <rect x="0" y="0" width="330" height="110" class="box shadow" fill="#E2EFD9"/>
+    <text x="165" y="34" text-anchor="middle" class="box-title">[3] Datazone 聚合</text>
+    <text x="165" y="66" text-anchor="middle" class="box-text">多张图 → 每 DZ 唯一嵌入</text>
+    <text x="165" y="92" text-anchor="middle" class="small-text">mean-pool fixes duplicate DZ bug</text>
+  </g>
+  <path class="arrow" d="M1335 1855 L1425 1855"/>
+
+  <g transform="translate(1425,1810)">
+    <rect x="0" y="0" width="235" height="150" class="box shadow" fill="#FFF2CC"/>
+    <text x="117" y="33" text-anchor="middle" class="box-title">[3.5] SVF 注入</text>
+    <text x="18" y="65" class="small-text">• class ratios</text>
+    <text x="18" y="92" class="small-text">• mean / std per DZ</text>
+    <text x="18" y="119" class="small-text">• train-only imputation</text>
+    <text x="18" y="143" class="small-text">• no val leakage</text>
+  </g>
+
+  <path class="arrow" d="M1542 1960 C1542 2025 910 2025 910 2075"/>
+
+  <g transform="translate(260,2075)">
+    <rect x="0" y="0" width="600" height="175" class="box shadow" fill="#EDEEF7"/>
+    <text x="300" y="35" text-anchor="middle" class="box-title">[4] 空间特征拼接 per fold</text>
+    <text x="35" y="70" class="box-text">• spatial lag: concat([self, neighbor_mean])</text>
+    <text x="35" y="102" class="box-text">• ego-gap: concat([self, self − neighbor_mean])</text>
+    <text x="35" y="134" class="box-text">• POI numeric vector: PoiFitter per fold</text>
+    <text x="35" y="166" class="box-text">• SAR target lag: mean(y_train_neighbors), 7-dim</text>
+  </g>
+  <path class="arrow" d="M860 2162 L945 2162"/>
+
+  <g transform="translate(945,2075)">
+    <rect x="0" y="0" width="350" height="175" class="box shadow" fill="#DFEBF7"/>
+    <text x="175" y="35" text-anchor="middle" class="box-title">[5] RidgeCV × 7 Domains</text>
+    <text x="35" y="75" class="box-text">StandardScaler</text>
+    <text x="35" y="107" class="box-text">clip ±30</text>
+    <text x="35" y="139" class="box-text">RidgeCV cv=5</text>
+    <text x="35" y="166" class="box-text">25 alpha grid</text>
+  </g>
+  <path class="arrow" d="M1295 2162 L1380 2162"/>
+
+  <g transform="translate(1380,2075)">
+    <rect x="0" y="0" width="280" height="175" class="box shadow" fill="#E2EFD9"/>
+    <text x="140" y="43" text-anchor="middle" class="box-title">Final Artifacts</text>
+    <text x="140" y="86" text-anchor="middle" class="box-text">OOF predictions</text>
+    <text x="140" y="120" text-anchor="middle" class="mono">cv_summary.json</text>
+    <text x="140" y="153" text-anchor="middle" class="small-text">Income / Employment / Health / Education / Access / Crime / Housing</text>
+  </g>
+
+  <!-- Bottom note -->
+  <rect x="310" y="2385" width="1180" height="42" rx="18" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="900" y="2412" text-anchor="middle" class="tiny-text">Design note: all text, boxes, arrows, colors, and layout are editable as vector objects in SVG-compatible editors.</text>
+</svg>

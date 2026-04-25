@@ -1,0 +1,32 @@
+# Route C modality_sep_v0 baseline + SegFormer-B2 (ADE20K) SVF features.
+# SVF is concatenated to X_text, so use_spatial_lag / use_ego_gap / use_dz_agg
+# automatically apply to the SVF columns (spatial spillover on SVF, per paper).
+
+dataset: outputs/decision/dataset_v1.jsonl
+out_dir: outputs/decision/route_c/modality_sep_svf_segformer_v1
+
+caption:
+  mode: modality_sep
+
+encoder:
+  backend: sbert
+  name: sentence-transformers/all-MiniLM-L6-v2
+  batch_size: 32
+  max_length: 256
+
+cv:
+  n_splits: 5
+
+train:
+  regressor: ridge_cv
+  use_poi_vec: true
+  use_spatial_lag: true
+  use_ego_gap: true
+  use_sar_lag: true
+  use_dz_agg: true
+  seed: 42
+
+svf:
+  parquets:
+    - outputs/perception/svf/datazone_svf_segformer.parquet
+  columns: [mean]       # use 15-dim class proportions. Set [mean, std] for 30-dim.

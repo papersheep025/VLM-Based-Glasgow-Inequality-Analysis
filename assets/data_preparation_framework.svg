@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Data Preparation and Preprocessing Framework</title>
+  <desc id="desc">A conference-style editable SVG diagram showing raw inputs, three preprocessing branches, QA visualization, and the downstream perception layer.</desc>
+  <defs>
+    <style>
+      .bg { fill: #fbfcff; }
+      .title { font-family: "Arial", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; font-size: 34px; font-weight: 800; fill: #233b73; }
+      .subtitle { font-family: "Arial", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; font-size: 16px; font-weight: 600; fill: #5b667a; }
+      .section-title { font-family: "Arial", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; font-size: 24px; font-weight: 800; fill: #152033; }
+      .section-title-small { font-family: "Arial", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; font-size: 20px; font-weight: 800; fill: #152033; }
+      .label { font-family: "Arial", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; font-size: 16px; font-weight: 700; fill: #25324a; }
+      .text { font-family: "Arial", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; font-size: 15px; fill: #25324a; }
+      .small { font-family: "Arial", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; font-size: 13px; fill: #566176; }
+      .mono { font-family: "SFMono-Regular", "Consolas", "Liberation Mono", monospace; font-size: 13px; fill: #324058; }
+      .mono-strong { font-family: "SFMono-Regular", "Consolas", "Liberation Mono", monospace; font-size: 14px; font-weight: 700; fill: #233b73; }
+      .card { fill: #ffffff; stroke: #8ba1c6; stroke-width: 1.4; filter: url(#shadow); }
+      .soft-card { fill: #ffffff; stroke: #b5c1d4; stroke-width: 1.2; }
+      .raw { fill: #edeef7; stroke: #7d87bd; stroke-width: 1.6; filter: url(#shadow); }
+      .peach { fill: #fce5d6; stroke: #d19874; stroke-width: 1.5; }
+      .blue { fill: #dfebf7; stroke: #6e95c7; stroke-width: 1.5; }
+      .green { fill: #e2efd9; stroke: #7bad68; stroke-width: 1.5; }
+      .yellow { fill: #fff2cc; stroke: #d3ae49; stroke-width: 1.5; }
+      .lavender { fill: #edeef7; stroke: #7d87bd; stroke-width: 1.5; }
+      .arrow { stroke: #6f7785; stroke-width: 3; fill: none; marker-end: url(#arrow); stroke-linecap: round; stroke-linejoin: round; }
+      .thin-arrow { stroke: #7f8793; stroke-width: 2.2; fill: none; marker-end: url(#arrowSmall); stroke-linecap: round; stroke-linejoin: round; }
+      .dash { stroke-dasharray: 7 7; }
+      .icon-stroke { stroke: #233b73; stroke-width: 3.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+      .icon-fill-blue { fill: #6e95c7; }
+      .icon-fill-green { fill: #7bad68; }
+      .icon-fill-yellow { fill: #d3ae49; }
+      .icon-fill-peach { fill: #d19874; }
+      .icon-fill-purple { fill: #7d87bd; }
+    </style>
+    <filter id="shadow" x="-8%" y="-8%" width="116%" height="116%">
+      <feDropShadow dx="0" dy="7" stdDeviation="7" flood-color="#2c3d5f" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6f7785"/>
+    </marker>
+    <marker id="arrowSmall" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7f8793"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1600" height="900"/>
+
+  <text class="title" x="800" y="56" text-anchor="middle">数据准备与预处理框架</text>
+  <text class="subtitle" x="800" y="84" text-anchor="middle">Raw multi-source urban data are converted into aligned, QA-checked inputs for the perception layer</text>
+
+  <!-- Raw input block -->
+  <rect class="raw" x="110" y="115" width="1380" height="150" rx="18"/>
+  <g transform="translate(142 145)">
+    <circle cx="28" cy="30" r="21" fill="#ffffff" stroke="#7d87bd" stroke-width="2"/>
+    <path class="icon-stroke" d="M28 16v28M16 30h24M19 21c5 4 13 4 18 0M19 39c5-4 13-4 18 0"/>
+  </g>
+  <text class="section-title" x="205" y="158">原始数据源</text>
+  <text class="subtitle" x="205" y="183">External / Raw Inputs</text>
+
+  <g transform="translate(370 139)">
+    <rect class="soft-card" x="0" y="0" width="270" height="44" rx="11" fill="#ffffff"/>
+    <text class="text" x="18" y="28">Glasgow datazone shapefile</text>
+    <text class="small" x="215" y="28">(746)</text>
+
+    <rect class="soft-card" x="292" y="0" width="210" height="44" rx="11" fill="#ffffff"/>
+    <text class="text" x="310" y="28">卫星 GeoTIFF</text>
+    <text class="small" x="414" y="28">glasgow.tif</text>
+
+    <rect class="soft-card" x="524" y="0" width="230" height="44" rx="11" fill="#ffffff"/>
+    <text class="text" x="542" y="28">夜光 GeoTIFF</text>
+    <text class="small" x="650" y="28">glasgow_ntl.tif</text>
+
+    <rect class="soft-card" x="776" y="0" width="280" height="44" rx="11" fill="#ffffff"/>
+    <text class="text" x="794" y="28">Mapillary / Google Street View API</text>
+
+    <rect class="soft-card" x="150" y="66" width="315" height="44" rx="11" fill="#ffffff"/>
+    <text class="text" x="168" y="94">OSM Overpass / Google Places API</text>
+
+    <rect class="soft-card" x="487" y="66" width="230" height="44" rx="11" fill="#ffffff"/>
+    <text class="text" x="505" y="94">SIMD 2020 score CSV</text>
+  </g>
+
+  <!-- Branch guide -->
+  <path class="arrow" d="M800 265 L800 305"/>
+  <path class="thin-arrow" d="M800 305 H290 V335"/>
+  <path class="thin-arrow" d="M800 305 V335"/>
+  <path class="thin-arrow" d="M800 305 H1310 V335"/>
+
+  <!-- Branch A -->
+  <g transform="translate(92 335)">
+    <rect class="peach" x="0" y="0" width="405" height="228" rx="16" filter="url(#shadow)"/>
+    <g transform="translate(28 28)">
+      <rect x="0" y="0" width="64" height="64" rx="12" fill="#ffffff" stroke="#d19874" stroke-width="1.5"/>
+      <path d="M14 50h36M16 18h32M16 34h32M22 12v44M38 12v44" stroke="#d19874" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </g>
+    <text class="section-title-small" x="112" y="42">A. 影像 Patch 裁剪</text>
+    <text class="subtitle" x="112" y="70">TIFF → PNG</text>
+    <line x1="30" y1="95" x2="375" y2="95" stroke="#d19874" stroke-width="1.2" opacity="0.65"/>
+    <text class="text" x="30" y="126">按 datazone 边界和中心点生成影像块</text>
+    <text class="text" x="30" y="154">统一空间参考、分辨率与命名规则</text>
+    <rect x="30" y="176" width="160" height="30" rx="8" fill="#ffffff" stroke="#d19874"/>
+    <text class="mono" x="44" y="196">satellite_dataset/</text>
+    <rect x="205" y="176" width="170" height="30" rx="8" fill="#ffffff" stroke="#d19874"/>
+    <text class="mono" x="219" y="196">datazone_patches/</text>
+  </g>
+
+  <!-- Branch B -->
+  <g transform="translate(598 335)">
+    <rect class="blue" x="0" y="0" width="405" height="228" rx="16" filter="url(#shadow)"/>
+    <g transform="translate(28 28)">
+      <rect x="0" y="10" width="64" height="46" rx="10" fill="#ffffff" stroke="#6e95c7" stroke-width="1.5"/>
+      <circle cx="32" cy="33" r="13" fill="none" stroke="#6e95c7" stroke-width="4"/>
+      <rect x="17" y="0" width="30" height="15" rx="5" fill="#ffffff" stroke="#6e95c7" stroke-width="1.5"/>
+    </g>
+    <text class="section-title-small" x="112" y="42">B. 街景抓取与对齐</text>
+    <text class="subtitle" x="112" y="70">API → JPG</text>
+    <line x1="30" y1="95" x2="375" y2="95" stroke="#6e95c7" stroke-width="1.2" opacity="0.65"/>
+    <text class="text" x="30" y="126">从 Mapillary / GSV 获取多视角街景</text>
+    <text class="text" x="30" y="154">对齐 datazone ID、坐标与方位信息</text>
+    <rect x="30" y="176" width="196" height="30" rx="8" fill="#ffffff" stroke="#6e95c7"/>
+    <text class="mono" x="44" y="196">streetview_dataset/</text>
+    <rect x="242" y="176" width="132" height="30" rx="8" fill="#ffffff" stroke="#6e95c7"/>
+    <text class="mono" x="256" y="196">*.jpg meta</text>
+  </g>
+
+  <!-- Branch C -->
+  <g transform="translate(1104 335)">
+    <rect class="green" x="0" y="0" width="405" height="228" rx="16" filter="url(#shadow)"/>
+    <g transform="translate(28 28)">
+      <rect x="0" y="0" width="64" height="64" rx="12" fill="#ffffff" stroke="#7bad68" stroke-width="1.5"/>
+      <path d="M32 12c-10 0-18 8-18 18 0 13 18 28 18 28s18-15 18-28c0-10-8-18-18-18z" fill="none" stroke="#7bad68" stroke-width="3"/>
+      <circle cx="32" cy="30" r="6" fill="#7bad68"/>
+    </g>
+    <text class="section-title-small" x="112" y="42">C. POI 抓取与匹配</text>
+    <text class="subtitle" x="112" y="70">API → CSV</text>
+    <line x1="30" y1="95" x2="375" y2="95" stroke="#7bad68" stroke-width="1.2" opacity="0.65"/>
+    <text class="text" x="30" y="126">抓取 OSM 与 Google Places 兴趣点</text>
+    <text class="text" x="30" y="154">按空间归属汇总到 datazone 粒度</text>
+    <rect x="30" y="176" width="135" height="30" rx="8" fill="#ffffff" stroke="#7bad68"/>
+    <text class="mono" x="44" y="196">poi_dataset/</text>
+    <rect x="181" y="176" width="110" height="30" rx="8" fill="#ffffff" stroke="#7bad68"/>
+    <text class="mono" x="195" y="196">osm_poi/</text>
+    <rect x="306" y="176" width="68" height="30" rx="8" fill="#ffffff" stroke="#7bad68"/>
+    <text class="mono" x="321" y="196">*.csv</text>
+  </g>
+
+  <!-- Merge to QA -->
+  <path class="thin-arrow" d="M295 563 V612 H800"/>
+  <path class="thin-arrow" d="M800 563 V612"/>
+  <path class="thin-arrow" d="M1305 563 V612 H800"/>
+
+  <g transform="translate(430 612)">
+    <rect class="yellow" x="0" y="0" width="740" height="112" rx="18" filter="url(#shadow)"/>
+    <g transform="translate(30 24)">
+      <rect x="0" y="0" width="62" height="62" rx="12" fill="#ffffff" stroke="#d3ae49" stroke-width="1.5"/>
+      <path d="M12 45l12-14 12 8 14-22" stroke="#d3ae49" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="24" cy="31" r="4" fill="#d3ae49"/>
+      <circle cx="36" cy="39" r="4" fill="#d3ae49"/>
+      <circle cx="50" cy="17" r="4" fill="#d3ae49"/>
+    </g>
+    <text class="section-title-small" x="114" y="40">D. 验证 / 可视化（QA）</text>
+    <text class="subtitle" x="114" y="68">Folium 交互地图 + 覆盖统计</text>
+    <rect x="462" y="25" width="235" height="62" rx="13" fill="#ffffff" stroke="#d3ae49" stroke-width="1.2"/>
+    <text class="text" x="485" y="51">检查 patch / street view / POI</text>
+    <text class="text" x="485" y="76">覆盖率、缺失区与空间错位</text>
+  </g>
+
+  <path class="arrow" d="M800 724 L800 770"/>
+
+  <!-- Perception output block -->
+  <g transform="translate(310 770)">
+    <rect class="lavender" x="0" y="0" width="980" height="82" rx="18" filter="url(#shadow)"/>
+    <g transform="translate(34 22)">
+      <path d="M19 4c-7 0-13 6-13 13 0 5 3 9 7 11-1 8 4 14 12 14h21c8 0 13-6 12-14 4-2 7-6 7-11 0-7-6-13-13-13-4 0-8 2-10 5-2-3-6-5-10-5-3 0-6 1-8 3-2-2-4-3-5-3z" fill="#ffffff" stroke="#7d87bd" stroke-width="2"/>
+      <path d="M25 16v20M39 16v20M19 25h26" stroke="#7d87bd" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </g>
+    <text class="section-title" x="120" y="35">进入 perception 层</text>
+    <text class="subtitle" x="120" y="61">Aligned multi-modal image, street-view, POI and QA artifacts become model-ready inputs</text>
+    <rect x="710" y="22" width="220" height="38" rx="10" fill="#ffffff" stroke="#7d87bd" stroke-width="1.2"/>
+    <text class="mono-strong" x="742" y="47">perception/</text>
+  </g>
+
+</svg>
